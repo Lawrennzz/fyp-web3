@@ -1,0 +1,81 @@
+/* Custom DatePicker Styles */
+.react-datepicker {
+  @apply bg-gray-800 border border-gray-700 rounded-lg shadow-xl !important;
+}
+
+.react-datepicker__header {
+  @apply bg-gray-900 border-b border-gray-700 rounded-t-lg !important;
+}
+
+.react-datepicker__current-month,
+.react-datepicker__day-name {
+  @apply text-gray-200 !important;
+}
+
+.react-datepicker__day {
+  @apply text-gray-300 hover:bg-gray-700 rounded !important;
+}
+
+.react-datepicker__day--selected {
+  @apply bg-blue-500 text-white hover:bg-blue-600 !important;
+}
+
+.react-datepicker__day--disabled {
+  @apply text-gray-600 hover:bg-transparent cursor-not-allowed !important;
+}
+
+.react-datepicker__navigation {
+  @apply top-2 !important;
+}
+
+.react-datepicker__navigation--previous {
+  @apply border-r border-gray-400 hover:border-gray-300 !important;
+}
+
+.react-datepicker__navigation--next {
+  @apply border-l border-gray-400 hover:border-gray-300 !important;
+}
+
+.react-datepicker__day--keyboard-selected {
+  @apply bg-blue-500 bg-opacity-50 text-white !important;
+}
+
+.react-datepicker__triangle {
+  @apply hidden !important;
+}
+
+.react-datepicker__day--today {
+  @apply font-bold text-blue-400 !important;
+}
+
+.react-datepicker__day--in-range {
+  @apply bg-blue-500 bg-opacity-30 text-white !important;
+}
+
+.react-datepicker__day--in-selecting-range {
+  @apply bg-blue-500 bg-opacity-20 text-white !important;
+}
+
+.react-datepicker__input-container input {
+  background-color: #374151 !important;
+  border: 1px solid #4b5563 !important;
+  color: #ffffff !important;
+  padding: 0.5rem !important;
+  border-radius: 0.5rem !important;
+  outline: none !important;
+}
+
+.react-datepicker__input-container input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5) !important;
+}
+
+.react-datepicker__input-container input::placeholder {
+  color: #9ca3af !important;
+}
+
+.react-datepicker__input-container input:disabled {
+  background-color: #1f2937 !important;
+  border-color: #374151 !important;
+  cursor: not-allowed !important;
+} 
