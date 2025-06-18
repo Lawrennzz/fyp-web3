@@ -2,6 +2,20 @@ const mongoose = require('mongoose');
 const Hotel = require('./models/Hotel');
 const config = require('./config');
 
+// Standardized amenities list
+const standardAmenities = [
+  'WiFi',
+  'Pool',
+  'Restaurant',
+  'Gym',
+  'Spa & Wellness',
+  'Parking',
+  'Kids-friendly',
+  'Room Service',
+  'Pet-friendly',
+  'Bar'
+];
+
 const sampleHotels = [
   {
     name: "Grand Plaza Hotel",
@@ -20,7 +34,7 @@ const sampleHotels = [
       alt: "Grand Plaza Hotel Exterior"
     }],
     pricePerNight: 299.99,
-    rating: 4.5,
+    rating: 8.5,
     stars: 5,
     amenities: [
       'WiFi',
@@ -28,7 +42,9 @@ const sampleHotels = [
       'Restaurant',
       'Gym',
       'Spa & Wellness',
-      'Parking'
+      'Parking',
+      'Room Service',
+      'Bar'
     ],
     maxGuests: 4,
     reviews: [],
@@ -51,7 +67,7 @@ const sampleHotels = [
       alt: "Seaside Resort Exterior"
     }],
     pricePerNight: 399.99,
-    rating: 4.8,
+    rating: 9.2,
     stars: 5,
     amenities: [
       'WiFi',
@@ -59,7 +75,9 @@ const sampleHotels = [
       'Restaurant',
       'Spa & Wellness',
       'Parking',
-      'Kids-friendly'
+      'Kids-friendly',
+      'Room Service',
+      'Bar'
     ],
     maxGuests: 6,
     reviews: [],
@@ -82,14 +100,16 @@ const sampleHotels = [
       alt: "Mountain View Lodge Exterior"
     }],
     pricePerNight: 249.99,
-    rating: 4.6,
+    rating: 8.8,
     stars: 4,
     amenities: [
       'WiFi',
       'Restaurant',
       'Parking',
       'Pet-friendly',
-      'Kids-friendly'
+      'Kids-friendly',
+      'Room Service',
+      'Bar'
     ],
     maxGuests: 8,
     reviews: [],
@@ -112,14 +132,15 @@ const sampleHotels = [
       alt: "City Lights Hotel Exterior"
     }],
     pricePerNight: 199.99,
-    rating: 4.3,
+    rating: 7.6,
     stars: 4,
     amenities: [
       'WiFi',
       'Restaurant',
       'Gym',
       'Parking',
-      'Business Center'
+      'Room Service',
+      'Bar'
     ],
     maxGuests: 3,
     reviews: [],
@@ -142,7 +163,7 @@ const sampleHotels = [
       alt: "Desert Oasis Resort Exterior"
     }],
     pricePerNight: 349.99,
-    rating: 4.7,
+    rating: 9.0,
     stars: 5,
     amenities: [
       'WiFi',
@@ -150,7 +171,9 @@ const sampleHotels = [
       'Spa & Wellness',
       'Restaurant',
       'Parking',
-      'Kids-friendly'
+      'Kids-friendly',
+      'Room Service',
+      'Bar'
     ],
     maxGuests: 5,
     reviews: [],

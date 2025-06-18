@@ -2,6 +2,26 @@ const express = require('express');
 const router = express.Router();
 const Hotel = require('../models/Hotel');
 
+// Standardized amenities list
+const standardAmenities = [
+  'WiFi',
+  'Pool',
+  'Restaurant',
+  'Gym',
+  'Spa & Wellness',
+  'Parking',
+  'Kids-friendly',
+  'Room Service',
+  'Pet-friendly',
+  'Bar'
+];
+
+// Validate amenities helper function
+const validateAmenities = (amenities) => {
+  if (!Array.isArray(amenities)) return false;
+  return amenities.every(amenity => standardAmenities.includes(amenity));
+};
+
 // Get facility counts - MUST be before /:id route to avoid conflict
 router.get('/facilities/count', async (req, res) => {
   try {
@@ -127,130 +147,163 @@ const transformHotelData = (hotel) => {
 // Get featured hotels
 router.get('/featured', async (req, res) => {
   try {
-    const featuredHotels = await Hotel.find()
-      .sort('-rating')
+    const hotels = await Hotel.find()
+      .sort({ rating: -1 })
       .limit(6);
-    
-    res.json(featuredHotels);
+    res.json(hotels);
   } catch (error) {
     console.error('Error fetching featured hotels:', error);
-    res.status(500).json({ message: 'Error fetching featured hotels', error: error.message });
+    res.status(500).json({ message: 'Error fetching featured hotels' });
   }
 });
 
-// GET /api/hotels - Get all hotels with optional filters
+// Get all hotels with filters
 router.get('/', async (req, res) => {
   try {
-    console.log('Received hotel search request with params:', req.query);
-
     const {
-      city,
+      location,
       checkIn,
       checkOut,
       guests,
-      rating,
-      stars,
-      amenities,
       minPrice,
       maxPrice,
-      sort = 'most_relevant'
+      amenities,
+      stars,
+      sort
     } = req.query;
 
-    // Build query object
-    const query = {};
+    let query = {};
 
-    // Location filter (case-insensitive partial match)
-    if (city) {
-      query.$or = [
-        { 'location.city': { $regex: city, $options: 'i' } },
-        { 'location.country': { $regex: city, $options: 'i' } }
-      ];
+    // Apply filters
+    if (location) {
+      query['location.city'] = new RegExp(location, 'i');
     }
 
-    // Price range filter
-    if (minPrice !== undefined || maxPrice !== undefined) {
+    if (minPrice || maxPrice) {
       query.pricePerNight = {};
-      if (minPrice !== undefined) query.pricePerNight.$gte = Number(minPrice);
-      if (maxPrice !== undefined) query.pricePerNight.$lte = Number(maxPrice);
+      if (minPrice) query.pricePerNight.$gte = Number(minPrice);
+      if (maxPrice) query.pricePerNight.$lte = Number(maxPrice);
     }
 
-    // Rating filter
-    if (rating) {
-      const ratings = rating.split(',').map(Number);
-      if (ratings.length) {
-        query.rating = { $in: ratings };
-      }
-    }
-
-    // Star rating filter
-    if (stars) {
-      const starValues = stars.split(',').map(Number);
-      if (starValues.length) {
-        query.stars = { $in: starValues };
-      }
-    }
-
-    // Amenities filter
-    if (amenities) {
-      const amenityList = amenities.split(',');
-      if (amenityList.length) {
-        query.amenities = { $all: amenityList };
-      }
-    }
-
-    // Guest capacity filter
     if (guests) {
       query.maxGuests = { $gte: Number(guests) };
     }
 
-    console.log('Final MongoDB query:', JSON.stringify(query, null, 2));
-
-    // Execute query with sorting
-    let hotelsQuery = Hotel.find(query);
-
-    // Apply sorting
-    switch (sort) {
-      case 'price_low':
-        hotelsQuery = hotelsQuery.sort({ pricePerNight: 1 });
-        break;
-      case 'price_high':
-        hotelsQuery = hotelsQuery.sort({ pricePerNight: -1 });
-        break;
-      case 'rating':
-        hotelsQuery = hotelsQuery.sort({ rating: -1 });
-        break;
-      case 'stars':
-        hotelsQuery = hotelsQuery.sort({ stars: -1 });
-        break;
-      default:
-        // most_relevant - sort by a combination of rating and stars
-        hotelsQuery = hotelsQuery.sort({ rating: -1, stars: -1 });
+    if (amenities) {
+      const amenitiesList = amenities.split(',');
+      if (validateAmenities(amenitiesList)) {
+        query.amenities = { $all: amenitiesList };
+      }
     }
 
-    const hotels = await hotelsQuery.exec();
-    console.log(`Found ${hotels.length} hotels matching criteria`);
-    
+    if (stars) {
+      query.stars = Number(stars);
+    }
+
+    // Apply sorting
+    let sortQuery = {};
+    switch (sort) {
+      case 'price_low':
+        sortQuery = { pricePerNight: 1 };
+        break;
+      case 'price_high':
+        sortQuery = { pricePerNight: -1 };
+        break;
+      case 'rating':
+        sortQuery = { rating: -1 };
+        break;
+      case 'stars':
+        sortQuery = { stars: -1 };
+        break;
+      default:
+        sortQuery = { rating: -1 }; // Default sort by rating
+    }
+
+    const hotels = await Hotel.find(query).sort(sortQuery);
     res.json(hotels);
   } catch (error) {
     console.error('Error fetching hotels:', error);
-    res.status(500).json({ message: 'Error fetching hotels', error: error.message });
+    res.status(500).json({ message: 'Error fetching hotels' });
   }
 });
 
-// GET /api/hotels/:id - Get a specific hotel by ID
+// Get hotel by ID
 router.get('/:id', async (req, res) => {
   try {
     const hotel = await Hotel.findById(req.params.id);
     if (!hotel) {
-      return res.status(404).json({ error: 'Hotel not found' });
+      return res.status(404).json({ message: 'Hotel not found' });
     }
     res.json(hotel);
   } catch (error) {
-    console.error('Error fetching hotel by ID:', error);
-    res.status(500).json({ 
-      error: 'Failed to fetch hotel',
-      details: error.message 
-    });
+    console.error('Error fetching hotel:', error);
+    res.status(500).json({ message: 'Error fetching hotel' });
+  }
+});
+
+// Create new hotel
+router.post('/', async (req, res) => {
+  try {
+    const hotelData = req.body;
+    
+    // Validate amenities
+    if (!validateAmenities(hotelData.amenities)) {
+      return res.status(400).json({ 
+        message: 'Invalid amenities. Must be from the standard list.',
+        validAmenities: standardAmenities
+      });
+    }
+
+    const hotel = new Hotel(hotelData);
+    await hotel.save();
+    res.status(201).json(hotel);
+  } catch (error) {
+    console.error('Error creating hotel:', error);
+    res.status(500).json({ message: 'Error creating hotel' });
+  }
+});
+
+// Update hotel
+router.put('/:id', async (req, res) => {
+  try {
+    const updates = req.body;
+    
+    // Validate amenities if they're being updated
+    if (updates.amenities && !validateAmenities(updates.amenities)) {
+      return res.status(400).json({ 
+        message: 'Invalid amenities. Must be from the standard list.',
+        validAmenities: standardAmenities
+      });
+    }
+
+    const hotel = await Hotel.findByIdAndUpdate(
+      req.params.id,
+      updates,
+      { new: true, runValidators: true }
+    );
+    
+    if (!hotel) {
+      return res.status(404).json({ message: 'Hotel not found' });
+    }
+    
+    res.json(hotel);
+  } catch (error) {
+    console.error('Error updating hotel:', error);
+    res.status(500).json({ message: 'Error updating hotel' });
+  }
+});
+
+// Delete hotel
+router.delete('/:id', async (req, res) => {
+  try {
+    const hotel = await Hotel.findByIdAndDelete(req.params.id);
+    if (!hotel) {
+      return res.status(404).json({ message: 'Hotel not found' });
+    }
+    res.json({ message: 'Hotel deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting hotel:', error);
+    res.status(500).json({ message: 'Error deleting hotel' });
   }
 });
 
