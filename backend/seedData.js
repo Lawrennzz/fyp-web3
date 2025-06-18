@@ -18,166 +18,148 @@ const standardAmenities = [
 
 const sampleHotels = [
   {
-    name: "Grand Plaza Hotel",
-    description: "Luxury hotel in the heart of the city with stunning views and world-class amenities.",
+    name: "The Ritz-Carlton",
+    description: "Luxury hotel with stunning views and world-class service",
     location: {
-      city: "New York",
-      country: "USA",
-      address: "123 Broadway St, New York, NY 10013",
+      city: "London",
+      country: "United Kingdom",
+      address: "150 Piccadilly, St. James's",
       coordinates: {
-        lat: 40.7128,
-        lng: -74.0060
+        lat: 51.5074,
+        lng: -0.1278
       }
     },
-    images: [{
-      url: "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3",
-      alt: "Grand Plaza Hotel Exterior"
-    }],
-    pricePerNight: 299.99,
-    rating: 8.5,
-    stars: 5,
-    amenities: [
-      'WiFi',
-      'Pool',
-      'Restaurant',
-      'Gym',
-      'Spa & Wellness',
-      'Parking',
-      'Room Service',
-      'Bar'
+    images: [
+      {
+        url: "https://images.unsplash.com/photo-1566073771259-6a8506099945",
+        alt: "Ritz-Carlton Exterior"
+      }
     ],
-    maxGuests: 4,
-    reviews: [],
-    bookings: []
+    pricePerNight: 500,
+    rating: 9.5,
+    stars: 5,
+    amenities: ["WiFi", "Pool", "Spa & Wellness", "Restaurant", "Bar"],
+    maxGuests: 4
   },
   {
-    name: "Seaside Resort & Spa",
-    description: "Beautiful beachfront resort offering relaxation and luxury by the ocean.",
+    name: "Four Seasons Hotel",
+    description: "Contemporary luxury in the heart of Dublin",
     location: {
-      city: "Miami",
-      country: "USA",
-      address: "456 Ocean Drive, Miami Beach, FL 33139",
+      city: "Dublin",
+      country: "Ireland",
+      address: "Simmonscourt Road",
       coordinates: {
-        lat: 25.7617,
-        lng: -80.1918
+        lat: 53.3498,
+        lng: -6.2603
       }
     },
-    images: [{
-      url: "https://images.unsplash.com/photo-1571896349842-33c89424de2d?ixlib=rb-4.0.3",
-      alt: "Seaside Resort Exterior"
-    }],
-    pricePerNight: 399.99,
+    images: [
+      {
+        url: "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb",
+        alt: "Four Seasons Exterior"
+      }
+    ],
+    pricePerNight: 450,
     rating: 9.2,
     stars: 5,
-    amenities: [
-      'WiFi',
-      'Pool',
-      'Restaurant',
-      'Spa & Wellness',
-      'Parking',
-      'Kids-friendly',
-      'Room Service',
-      'Bar'
-    ],
-    maxGuests: 6,
-    reviews: [],
-    bookings: []
+    amenities: ["WiFi", "Pool", "Gym", "Restaurant"],
+    maxGuests: 3
   },
   {
-    name: "Mountain View Lodge",
-    description: "Cozy mountain retreat perfect for outdoor enthusiasts and families.",
+    name: "Shangri-La Bosphorus",
+    description: "Elegant luxury hotel with Bosphorus views",
     location: {
-      city: "Aspen",
-      country: "USA",
-      address: "789 Mountain Road, Aspen, CO 81611",
+      city: "Istanbul",
+      country: "Turkey",
+      address: "Sinanpaşa Mah",
       coordinates: {
-        lat: 39.1911,
-        lng: -106.8175
+        lat: 41.0082,
+        lng: 28.9784
       }
     },
-    images: [{
-      url: "https://images.unsplash.com/photo-1626268220142-f4fb8f4a8d8c?ixlib=rb-4.0.3",
-      alt: "Mountain View Lodge Exterior"
-    }],
-    pricePerNight: 249.99,
-    rating: 8.8,
-    stars: 4,
-    amenities: [
-      'WiFi',
-      'Restaurant',
-      'Parking',
-      'Pet-friendly',
-      'Kids-friendly',
-      'Room Service',
-      'Bar'
+    images: [
+      {
+        url: "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa",
+        alt: "Shangri-La Exterior"
+      }
     ],
-    maxGuests: 8,
-    reviews: [],
-    bookings: []
-  },
-  {
-    name: "City Lights Hotel",
-    description: "Modern urban hotel with excellent business facilities and city views.",
-    location: {
-      city: "Chicago",
-      country: "USA",
-      address: "321 Michigan Ave, Chicago, IL 60601",
-      coordinates: {
-        lat: 41.8781,
-        lng: -87.6298
-      }
-    },
-    images: [{
-      url: "https://images.unsplash.com/photo-1590381105924-c72589b9ef3f?ixlib=rb-4.0.3",
-      alt: "City Lights Hotel Exterior"
-    }],
-    pricePerNight: 199.99,
-    rating: 7.6,
-    stars: 4,
-    amenities: [
-      'WiFi',
-      'Restaurant',
-      'Gym',
-      'Parking',
-      'Room Service',
-      'Bar'
-    ],
-    maxGuests: 3,
-    reviews: [],
-    bookings: []
-  },
-  {
-    name: "Desert Oasis Resort",
-    description: "Luxurious desert retreat with stunning views and world-class spa facilities.",
-    location: {
-      city: "Phoenix",
-      country: "USA",
-      address: "555 Desert Road, Phoenix, AZ 85001",
-      coordinates: {
-        lat: 33.4484,
-        lng: -112.0740
-      }
-    },
-    images: [{
-      url: "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?ixlib=rb-4.0.3",
-      alt: "Desert Oasis Resort Exterior"
-    }],
-    pricePerNight: 349.99,
+    pricePerNight: 400,
     rating: 9.0,
     stars: 5,
-    amenities: [
-      'WiFi',
-      'Pool',
-      'Spa & Wellness',
-      'Restaurant',
-      'Parking',
-      'Kids-friendly',
-      'Room Service',
-      'Bar'
+    amenities: ["WiFi", "Pool", "Spa & Wellness", "Restaurant"],
+    maxGuests: 4
+  },
+  {
+    name: "Le Royal Monceau",
+    description: "Artistic luxury hotel near the Champs-Élysées",
+    location: {
+      city: "Paris",
+      country: "France",
+      address: "37 Avenue Hoche",
+      coordinates: {
+        lat: 48.8566,
+        lng: 2.3522
+      }
+    },
+    images: [
+      {
+        url: "https://images.unsplash.com/photo-1564501049412-61c2a3083791",
+        alt: "Le Royal Monceau Exterior"
+      }
     ],
-    maxGuests: 5,
-    reviews: [],
-    bookings: []
+    pricePerNight: 600,
+    rating: 9.3,
+    stars: 5,
+    amenities: ["WiFi", "Pool", "Spa & Wellness", "Restaurant", "Bar"],
+    maxGuests: 3
+  },
+  {
+    name: "Mandarin Oriental",
+    description: "Contemporary luxury with Asian influences",
+    location: {
+      city: "London",
+      country: "United Kingdom",
+      address: "66 Knightsbridge",
+      coordinates: {
+        lat: 51.5074,
+        lng: -0.1278
+      }
+    },
+    images: [
+      {
+        url: "https://images.unsplash.com/photo-1561501900-3701fa6a0864",
+        alt: "Mandarin Oriental Exterior"
+      }
+    ],
+    pricePerNight: 550,
+    rating: 9.4,
+    stars: 5,
+    amenities: ["WiFi", "Pool", "Spa & Wellness", "Restaurant"],
+    maxGuests: 4
+  },
+  {
+    name: "The Merrion Hotel",
+    description: "Classic luxury in Georgian Dublin",
+    location: {
+      city: "Dublin",
+      country: "Ireland",
+      address: "Upper Merrion Street",
+      coordinates: {
+        lat: 53.3498,
+        lng: -6.2603
+      }
+    },
+    images: [
+      {
+        url: "https://images.unsplash.com/photo-1566073771259-6a8506099945",
+        alt: "Merrion Hotel Exterior"
+      }
+    ],
+    pricePerNight: 400,
+    rating: 9.1,
+    stars: 5,
+    amenities: ["WiFi", "Pool", "Spa & Wellness", "Restaurant", "Bar"],
+    maxGuests: 3
   }
 ];
 
@@ -198,31 +180,17 @@ const seedDatabase = async () => {
     const hotels = await Hotel.insertMany(sampleHotels);
     
     console.log(`Successfully seeded ${hotels.length} hotels`);
-    return hotels;
+    
+    // Close the connection
+    await mongoose.connection.close();
+    console.log('Database connection closed');
+    
+    process.exit(0);
   } catch (error) {
     console.error('Error seeding database:', error);
-    throw error;
-  } finally {
-    // Disconnect from MongoDB
-    await mongoose.disconnect();
-    console.log('Disconnected from MongoDB');
+    process.exit(1);
   }
 };
 
-module.exports = {
-  seedDatabase,
-  sampleHotels
-};
-
-// Execute seeding if this file is run directly
-if (require.main === module) {
-  seedDatabase()
-    .then(() => {
-      console.log('Database seeding completed');
-      process.exit(0);
-    })
-    .catch(error => {
-      console.error('Database seeding failed:', error);
-      process.exit(1);
-    });
-} 
+// Run the seeding function
+seedDatabase(); 

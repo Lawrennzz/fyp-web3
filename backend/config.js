@@ -1,8 +1,8 @@
 require('dotenv').config();
 
 module.exports = {
-    port: process.env.PORT || 5055,
-    mongoURI: process.env.MONGODB_URI || 'mongodb://localhost:27017/travelgo',
+    port: process.env.PORT || 3001,
+    mongoURI: 'mongodb://localhost:27017/travel_go',
     jwtSecret: process.env.JWT_SECRET || 'your-secret-key',
     corsOptions: {
         origin: process.env.FRONTEND_URL || 'http://localhost:3000',

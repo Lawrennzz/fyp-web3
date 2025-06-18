@@ -1,83 +1,45 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const config = require('./config');
+const dotenv = require('dotenv');
 const hotelRoutes = require('./routes/hotels');
 
+// Load environment variables
+dotenv.config();
+
 const app = express();
+const PORT = process.env.PORT || 3001;
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/travel_go';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 // Middleware
-app.use(cors());
 app.use(express.json());
-
-// Request logging middleware
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path} - Query:`, req.query);
-  next();
-});
-
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  const healthcheck = {
-    uptime: process.uptime(),
-    status: 'OK',
-    timestamp: Date.now(),
-    mongoConnection: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
-  };
-  res.json(healthcheck);
-});
-
-// Debug middleware to log all registered routes
-app._router.stack.forEach(function(r){
-  if (r.route && r.route.path){
-    console.log('Route:', r.route.path);
-    console.log('Methods:', Object.keys(r.route.methods));
-  }
-});
+app.use(cors({
+  origin: FRONTEND_URL,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Routes
 app.use('/api/hotels', hotelRoutes);
 
-// Debug middleware to log all registered routes after mounting
-app._router.stack.forEach(function(r){
-  if (r.route && r.route.path){
-    console.log('Route after mounting:', r.route.path);
-    console.log('Methods:', Object.keys(r.route.methods));
-  }
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', message: 'Server is running' });
 });
 
 // Connect to MongoDB
-mongoose.connect(config.mongoURI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => {
-  console.log('Connected to MongoDB');
-  
-  // Start server only after successful DB connection
-  const PORT = config.port || 5000;
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`API base URL: http://localhost:${PORT}/api`);
-    console.log('Available routes:');
-    console.log('- GET /api/health');
-    console.log('- GET /api/hotels');
-    console.log('- GET /api/hotels/facilities/count');
-    console.log('- GET /api/hotels/:id');
-
-    // Log all registered routes one final time
-    console.log('\nAll registered routes:');
-    app._router.stack.forEach(function(r){
-      if (r.route && r.route.path){
-        console.log(`${Object.keys(r.route.methods).join(',')} ${r.route.path}`);
-      }
+mongoose.connect(MONGODB_URI)
+  .then(() => {
+    console.log('Connected to MongoDB');
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
     });
+  })
+  .catch((error) => {
+    console.error('MongoDB connection error:', error);
+    process.exit(1);
   });
-})
-.catch((error) => {
-  console.error('MongoDB connection error:', error);
-  process.exit(1);
-});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
