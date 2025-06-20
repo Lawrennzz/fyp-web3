@@ -19,13 +19,15 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const router = useRouter();
-  const { useAccount } = hooks;
+  const { useAccount, useIsActive } = hooks;
   const account = useAccount();
+  const isActive = useIsActive();
   const { user } = useAuth();
   const { walletAddress } = useWalletConnect();
   const isGoogleUser = user && localStorage.getItem('lastProvider') === 'google';
   const isGuest = localStorage.getItem('isGuest') === 'true';
-  const isConnected = !!account || !!walletAddress || isGoogleUser || isGuest;
+  const isMetaMaskConnected = isActive && account;
+  const isConnected = isMetaMaskConnected || !!walletAddress || isGoogleUser || isGuest;
   const [showWalletDetails, setShowWalletDetails] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
 
@@ -42,25 +44,30 @@ export default function Layout({ children }: LayoutProps) {
     }
   }, []);
 
-  // Close wallet details when clicking outside
+  // Close modals when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
       const walletDetails = document.getElementById('wallet-details');
-      const walletButton = document.getElementById('wallet-button');
-      if (walletDetails && !walletDetails.contains(event.target as Node) && 
-          walletButton && !walletButton.contains(event.target as Node)) {
+      const connectModal = document.getElementById('connect-modal');
+      
+      if (walletDetails && !walletDetails.contains(target) && 
+          !target.closest('.wallet-button')) {
         setShowWalletDetails(false);
+      }
+      
+      if (connectModal && !connectModal.contains(target) && 
+          !target.closest('.connect-button')) {
+        setShowConnectModal(false);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const getDisplayAddress = () => {
-    if (account) {
+    if (isMetaMaskConnected && account) {
       return `${account.slice(0, 6)}...${account.slice(-4)}`;
     }
     if (user) {
@@ -73,7 +80,7 @@ export default function Layout({ children }: LayoutProps) {
   };
 
   const getAccountIcon = () => {
-    if (account) {
+    if (isMetaMaskConnected) {
       return (
         <Image
           src="/metamask-fox.svg"
@@ -142,11 +149,11 @@ export default function Layout({ children }: LayoutProps) {
                 </div>
               </div>
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center relative">
               {getDisplayAddress() ? (
                 <button
                   onClick={() => setShowWalletDetails(!showWalletDetails)}
-                  className="flex items-center px-4 py-2 text-sm font-medium text-white bg-[#2d2d2d] hover:bg-[#333333] rounded-lg transition-colors relative"
+                  className="wallet-button flex items-center px-4 py-2 text-sm font-medium text-white bg-[#2a2b2f] hover:bg-[#2f3033] rounded-xl transition-colors relative"
                 >
                   {getAccountIcon()}
                   {getDisplayAddress()}
@@ -154,18 +161,20 @@ export default function Layout({ children }: LayoutProps) {
               ) : (
                 <button
                   onClick={() => setShowConnectModal(true)}
-                  className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                  className="connect-button flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors"
                 >
                   Connect Wallet
                 </button>
               )}
               {showWalletDetails && (
-                <div className="absolute top-16 right-4 z-50 w-96 shadow-xl">
+                <div id="wallet-details" className="absolute top-12 right-0 mt-2 z-50 w-96 shadow-xl">
                   <WalletDetails onClose={() => setShowWalletDetails(false)} />
                 </div>
               )}
               {showConnectModal && (
-                <ConnectWalletModal onClose={() => setShowConnectModal(false)} />
+                <div id="connect-modal">
+                  <ConnectWalletModal onClose={() => setShowConnectModal(false)} />
+                </div>
               )}
             </div>
           </div>

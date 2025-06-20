@@ -4,6 +4,10 @@ import { config } from '../config';
 import { switchToGanacheNetwork } from '../utils/web3';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth } from '../config/firebase';
+import { useWeb3React } from '@web3-react/core';
+import { Web3Provider } from '@ethersproject/providers';
+import { hooks, metaMask } from '../utils/web3Config';
+import { useAuth } from '../contexts/FirebaseContext';
 
 // Add MetaMask Ethereum provider type
 declare global {
@@ -27,9 +31,15 @@ interface UseWalletConnectReturn {
   connectWallet: (provider: WalletProvider, payload?: any) => Promise<void>;
   disconnectWallet: () => Promise<void>;
   walletAddress: string | null;
+  connectAsGuest: () => Promise<void>;
 }
 
-export const useWalletConnect = (): UseWalletConnectReturn => {
+export function useWalletConnect(): UseWalletConnectReturn {
+  const { connector } = useWeb3React<Web3Provider>();
+  const { useAccount, useIsActive } = hooks;
+  const account = useAccount();
+  const isActive = useIsActive();
+  const { user } = useAuth();
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(() => {
@@ -116,6 +126,9 @@ export const useWalletConnect = (): UseWalletConnectReturn => {
               setWalletAddress(accounts[0]);
               localStorage.setItem('walletAddress', accounts[0]);
               localStorage.setItem('lastProvider', 'metamask');
+              
+              // Activate MetaMask connector
+              await metaMask.connectEagerly();
             } else {
               setError('Please switch to the Ganache network in MetaMask.');
             }
@@ -173,6 +186,9 @@ export const useWalletConnect = (): UseWalletConnectReturn => {
 
           console.log('Requesting account access...');
           try {
+            // Activate MetaMask connector
+            await metaMask.activate();
+
             // Request account access
             const accounts = await window.ethereum.request({ 
               method: 'eth_requestAccounts' 
@@ -190,78 +206,47 @@ export const useWalletConnect = (): UseWalletConnectReturn => {
               await switchToGanacheNetwork();
               const updatedNetwork = await provider.getNetwork();
               if (updatedNetwork.chainId !== config.NETWORK_ID) {
-                throw new Error('Failed to switch to the Ganache network. Please try again or switch manually in MetaMask.');
+                throw new Error('Please switch to the Ganache network in MetaMask.');
               }
             }
 
+            // Update state and localStorage
             updateWalletState(accounts[0], null);
-            console.log('Successfully connected to MetaMask');
-          } catch (requestError: any) {
-            if (requestError.code === 4001) {
-              throw new Error('Please accept the connection request in your MetaMask extension.');
-            }
-            throw requestError;
-          }
-          break;
-        }
-
-        case 'coinbase':
-          // Implement Coinbase Wallet connection
-          throw new Error('Coinbase Wallet connection not implemented yet');
-
-        case 'social':
-          // Implement social login
-          throw new Error('Social login not implemented yet');
-
-        case 'email':
-          // Implement email login
-          if (!payload?.email) {
-            throw new Error('Email is required');
-          }
-          // Add your email login logic here
-          break;
-
-        case 'phone':
-          // Implement phone login
-          throw new Error('Phone login not implemented yet');
-
-        case 'passkey':
-          // Implement passkey login
-          throw new Error('Passkey login not implemented yet');
-
-        case 'guest':
-          // Generate a temporary guest ID
-          const guestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          setWalletAddress(guestId);
-          localStorage.setItem('guestId', guestId);
-          localStorage.setItem('isGuest', 'true');
-          localStorage.setItem('lastProvider', 'guest');
-          break;
-
-        case 'google':
-          try {
-            const provider = new GoogleAuthProvider();
-            const result = await signInWithPopup(auth, provider);
-            if (result.user) {
-              setWalletAddress(result.user.uid);
-              localStorage.setItem('walletAddress', result.user.uid);
-            } else {
-              throw new Error('Failed to sign in with Google');
-            }
-          } catch (error) {
-            console.error('Google sign in error:', error);
+            localStorage.setItem('lastProvider', 'metamask');
+            console.log('Successfully connected to MetaMask:', accounts[0]);
+          } catch (error: any) {
+            console.error('MetaMask connection error:', error);
             throw error;
           }
           break;
-
+        }
+        case 'google': {
+          const provider = new GoogleAuthProvider();
+          const result = await signInWithPopup(auth, provider);
+          if (result.user) {
+            localStorage.setItem('lastProvider', 'google');
+          }
+          break;
+        }
+        case 'guest': {
+          // Generate a random guest ID
+          const guestId = Math.random().toString(36).substring(2, 15);
+          
+          // Store guest info in localStorage
+          localStorage.setItem('isGuest', 'true');
+          localStorage.setItem('guestId', guestId);
+          localStorage.setItem('lastProvider', 'guest');
+          
+          // Update state
+          updateWalletState(guestId, null);
+          break;
+        }
         default:
-          throw new Error('Unknown provider');
+          throw new Error('Unsupported wallet provider');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Connection error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to connect wallet';
-      console.error('Error details:', errorMessage);
-      setError(errorMessage);
+      setError(err.message || 'Failed to connect wallet');
       throw err;
     } finally {
       setIsConnecting(false);
@@ -270,41 +255,30 @@ export const useWalletConnect = (): UseWalletConnectReturn => {
 
   const disconnectWallet = useCallback(async () => {
     try {
-      // Handle MetaMask disconnect
-      const ethereum = window?.ethereum;
-      if (ethereum) {
-        try {
-          // Clear any cached permissions
-          await ethereum.request({
-            method: 'wallet_revokePermissions',
-            params: [{ eth_accounts: {} }]
-          }).catch(() => {});
-
-          // Remove event listeners
-          ethereum.removeListener('chainChanged', handleChainChanged);
-          ethereum.removeListener('accountsChanged', handleAccountsChanged);
-        } catch (error) {
-          console.error('Error disconnecting MetaMask:', error);
-        }
+      if (connector?.deactivate) {
+        await connector.deactivate();
       }
-
-      // Clear all states
+      
+      // Clear all connection states
+      localStorage.removeItem('walletAddress');
+      localStorage.removeItem('lastProvider');
+      localStorage.removeItem('isGuest');
+      localStorage.removeItem('guestId');
+      localStorage.setItem('isDisconnected', 'true');
+      
+      // Reset states
       setWalletAddress(null);
       setError(null);
-      setIsConnecting(false);
-
-      // Clear all local storage related to wallet connections
-      localStorage.clear();
       
-      // Set disconnected state
-      localStorage.setItem('isDisconnected', 'true');
     } catch (err) {
-      console.error('Error disconnecting:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to disconnect';
-      setError(errorMessage);
+      console.error('Error disconnecting wallet:', err);
       throw err;
     }
-  }, [handleChainChanged, handleAccountsChanged]);
+  }, [connector]);
+
+  const connectAsGuest = useCallback(async () => {
+    await connectWallet('guest');
+  }, [connectWallet]);
 
   return {
     isConnecting,
@@ -312,5 +286,6 @@ export const useWalletConnect = (): UseWalletConnectReturn => {
     connectWallet,
     disconnectWallet,
     walletAddress,
+    connectAsGuest,
   };
-}; 
+} 

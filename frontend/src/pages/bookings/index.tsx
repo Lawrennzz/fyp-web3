@@ -53,10 +53,10 @@ export default function Bookings() {
   useEffect(() => {
     if (!account || !db) return;
 
-    const fetchBookings = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  const fetchBookings = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
         const bookingsRef = collection(db, 'bookings');
         const q = query(
@@ -72,13 +72,13 @@ export default function Bookings() {
         })) as Booking[];
 
         setBookings(bookingsData);
-      } catch (error) {
-        console.error('Error fetching bookings:', error);
+    } catch (error) {
+      console.error('Error fetching bookings:', error);
         setError('Failed to load bookings. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
+    } finally {
+      setLoading(false);
+    }
+  };
 
     fetchBookings();
   }, [account, db]);
@@ -141,8 +141,8 @@ export default function Bookings() {
                         alt={booking.hotelDetails.name}
                         fill
                         className="object-cover"
-                      />
-                    </div>
+                    />
+                  </div>
 
                     {/* Booking Details */}
                     <div className="flex-1 p-6">
@@ -151,14 +151,14 @@ export default function Bookings() {
                           <h2 className="text-2xl font-semibold mb-2">{booking.hotelDetails.name}</h2>
                           <p className="text-gray-400">
                             {booking.hotelDetails.location.city}, {booking.hotelDetails.location.country}
-                          </p>
+                      </p>
                         </div>
                         <div className="mt-4 md:mt-0">
                           <span className={`px-3 py-1 rounded-full text-sm ${
                             booking.status === 'confirmed' ? 'bg-green-500/20 text-green-500' : 'bg-yellow-500/20 text-yellow-500'
-                          }`}>
+                      }`}>
                             {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                          </span>
+                      </span>
                         </div>
                       </div>
 
@@ -179,7 +179,7 @@ export default function Bookings() {
                           <p className="text-gray-400">Check-out</p>
                           <p className="font-medium">{format(booking.checkOut.toDate(), 'PPP')}</p>
                         </div>
-                      </div>
+                  </div>
 
                       <div className="flex flex-col md:flex-row justify-between items-start md:items-center pt-4 border-t border-gray-700">
                         <div className="mb-4 md:mb-0">
@@ -189,8 +189,8 @@ export default function Bookings() {
                         <div className="space-y-2">
                           <a
                             href={`https://sepolia.etherscan.io/tx/${booking.transactionHash}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                      target="_blank"
+                      rel="noopener noreferrer"
                             className="block text-sm text-blue-400 hover:text-blue-300"
                           >
                             View Transaction
@@ -198,16 +198,16 @@ export default function Bookings() {
                           <button
                             onClick={() => router.push(`/hotels/${booking.hotelId}`)}
                             className="block text-sm text-blue-400 hover:text-blue-300"
-                          >
+                    >
                             View Hotel
                           </button>
                         </div>
                       </div>
-                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
+          </div>
           )}
         </div>
       </div>
