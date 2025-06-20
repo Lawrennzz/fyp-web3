@@ -126,7 +126,7 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
   // Initialize dates from URL query
   useEffect(() => {
     if (router.isReady && isInitialLoad) {
-      const { checkIn: checkInQuery, checkOut: checkOutQuery } = router.query;
+      const { checkIn: checkInQuery, checkOut: checkOutQuery, guests } = router.query;
       
       if (checkInQuery) {
         const checkInDate = new Date(checkInQuery as string);
@@ -141,18 +141,23 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
           setCheckOut(checkOutDate);
         }
       }
+
+      if (guests) {
+        setSelectedGuests(Number(guests));
+      }
       
       setIsInitialLoad(false);
     }
   }, [router.isReady, today, isInitialLoad]);
 
-  // Update URL when dates change
+  // Update URL when dates or guests change
   useEffect(() => {
     if (router.isReady && !isInitialLoad) {
       const newQuery = {
         ...router.query,
         checkIn: checkIn ? checkIn.toISOString() : undefined,
-        checkOut: checkOut ? checkOut.toISOString() : undefined
+        checkOut: checkOut ? checkOut.toISOString() : undefined,
+        guests: selectedGuests
       };
 
       // Remove undefined values
@@ -168,7 +173,7 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
         }, undefined, { shallow: true });
       }
     }
-  }, [checkIn, checkOut, router.isReady, isInitialLoad, router.pathname, router.query]);
+  }, [checkIn, checkOut, selectedGuests, router.isReady, isInitialLoad, router.pathname, router.query]);
 
   // Handle date changes
   const handleCheckInChange = (date: Date | null) => {
@@ -187,9 +192,10 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
     }
   };
 
-  // Check if a room is available for selected dates
+  // Check if a room is available for selected dates and guest count
   const isRoomAvailable = (room: Room) => {
     if (!checkIn || !checkOut) return true; // If no dates selected, show all rooms
+    if (selectedGuests > room.maxGuests) return false; // Check if room can accommodate the guests
     return true; // For now, just return true as we haven't implemented booking storage yet
   };
 
@@ -198,25 +204,23 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
       alert('Please connect your wallet first');
       return;
     }
+
     if (!checkIn || !checkOut) {
       alert('Please select check-in and check-out dates');
       return;
     }
 
-    // Calculate number of nights
-    const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
-    
-    // Find the selected room
-    const selectedRoom = hotel?.rooms.find(room => room._id === roomId);
-    if (!selectedRoom) {
+    const selectedRoomDetails = hotel?.rooms.find(room => room._id === roomId);
+    if (!selectedRoomDetails) {
       alert('Room not found');
       return;
     }
 
-    // Calculate total price
-    const totalPrice = selectedRoom.pricePerNight * nights;
+    if (selectedGuests > selectedRoomDetails.maxGuests) {
+      alert(`This room can only accommodate ${selectedRoomDetails.maxGuests} guests`);
+      return;
+    }
 
-    // Redirect to checkout page with booking details
     router.push({
       pathname: `/checkout/${roomId}`,
       query: {
@@ -224,8 +228,8 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
         checkIn: checkIn.toISOString(),
         checkOut: checkOut.toISOString(),
         guests: selectedGuests,
-        nights,
-        totalPrice,
+        nights: Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)),
+        totalPrice: selectedRoomDetails.pricePerNight * Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24))
       }
     });
   };

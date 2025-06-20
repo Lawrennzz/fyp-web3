@@ -5,11 +5,12 @@ import Layout from '../../components/Layout';
 import { useWeb3React } from '@web3-react/core';
 import { Web3Provider } from '@ethersproject/providers';
 import { useFirebase } from '../../contexts/FirebaseContext';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, onSnapshot } from 'firebase/firestore';
 import { format } from 'date-fns';
 
 interface Booking {
   id: string;
+  userId: string;
   hotelId: string;
   roomId: string;
   hotelName: string;
@@ -20,6 +21,8 @@ interface Booking {
   totalPrice: number;
   status: string;
   transactionHash: string;
+  approvalHash: string;
+  createdAt: any;
   hotelDetails: {
     name: string;
     location: {
@@ -53,10 +56,12 @@ export default function Bookings() {
   useEffect(() => {
     if (!account || !db) return;
 
-  const fetchBookings = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+    const fetchBookings = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        console.log('Fetching bookings for account:', account.toLowerCase());
 
         const bookingsRef = collection(db, 'bookings');
         const q = query(
@@ -66,21 +71,81 @@ export default function Bookings() {
         );
 
         const querySnapshot = await getDocs(q);
-        const bookingsData = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Booking[];
+        console.log('Found bookings:', querySnapshot.size);
+
+        const bookingsData = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          console.log('Booking data:', data);
+          return {
+            id: doc.id,
+            userId: data.userId,
+            hotelId: data.hotelId,
+            roomId: data.roomId,
+            hotelName: data.hotelName,
+            roomType: data.roomType,
+            checkIn: data.checkIn,
+            checkOut: data.checkOut,
+            guests: data.guests,
+            totalPrice: data.totalPrice,
+            status: data.status,
+            transactionHash: data.transactionHash,
+            approvalHash: data.approvalHash,
+            createdAt: data.createdAt,
+            hotelDetails: data.hotelDetails,
+            roomDetails: data.roomDetails,
+            guestInfo: data.guestInfo
+          } as Booking;
+        });
 
         setBookings(bookingsData);
-    } catch (error) {
-      console.error('Error fetching bookings:', error);
+      } catch (error) {
+        console.error('Error fetching bookings:', error);
         setError('Failed to load bookings. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+      } finally {
+        setLoading(false);
+      }
+    };
 
     fetchBookings();
+
+    // Set up real-time listener for new bookings
+    const bookingsRef = collection(db, 'bookings');
+    const q = query(
+      bookingsRef,
+      where('userId', '==', account.toLowerCase()),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const newBookings = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          userId: data.userId,
+          hotelId: data.hotelId,
+          roomId: data.roomId,
+          hotelName: data.hotelName,
+          roomType: data.roomType,
+          checkIn: data.checkIn,
+          checkOut: data.checkOut,
+          guests: data.guests,
+          totalPrice: data.totalPrice,
+          status: data.status,
+          transactionHash: data.transactionHash,
+          approvalHash: data.approvalHash,
+          createdAt: data.createdAt,
+          hotelDetails: data.hotelDetails,
+          roomDetails: data.roomDetails,
+          guestInfo: data.guestInfo
+        } as Booking;
+      });
+      setBookings(newBookings);
+    }, (error) => {
+      console.error('Error in real-time bookings listener:', error);
+    });
+
+    // Cleanup subscription
+    return () => unsubscribe();
   }, [account, db]);
 
   if (!account) {

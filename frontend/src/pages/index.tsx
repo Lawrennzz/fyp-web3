@@ -100,21 +100,38 @@ export default function Home() {
     }
   };
 
-  // Function to handle check-in date change
-  const handleCheckInChange = (date: Date | null) => {
-    setCheckIn(date);
-    // If check-out is before new check-in, update it
-    if (date && checkOut && checkOut <= date) {
-      const newCheckOut = new Date(date);
-      newCheckOut.setDate(newCheckOut.getDate() + 1);
-      setCheckOut(newCheckOut);
-    }
+  // Function to get tomorrow's date based on a reference date
+  const getTomorrow = (date: Date) => {
+    const tomorrow = new Date(date);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow;
   };
 
-  // Function to handle check-out date change
-  const handleCheckOutChange = (date: Date | null) => {
-    if (date && checkIn && date > checkIn) {
-      setCheckOut(date);
+  // Function to format date to YYYY-MM-DD
+  const formatDate = (date: Date) => {
+    return date.toISOString().split('T')[0];
+  };
+
+  // Handle check-in date change
+  const handleCheckInChange = (date: Date) => {
+    const checkInDate = new Date(date);
+    const currentCheckOut = checkOut || getTomorrow(checkInDate);
+
+    // If check-out is before new check-in, set check-out to the next day
+    if (currentCheckOut <= checkInDate) {
+      setCheckOut(getTomorrow(checkInDate));
+    }
+    setCheckIn(checkInDate);
+  };
+
+  // Handle check-out date change
+  const handleCheckOutChange = (date: Date) => {
+    const checkOutDate = new Date(date);
+    const checkInDate = checkIn || new Date();
+
+    // Only update if check-out is after check-in
+    if (checkOutDate > checkInDate) {
+      setCheckOut(checkOutDate);
     }
   };
 
@@ -196,29 +213,31 @@ export default function Home() {
 
                       {/* Check-in Date */}
                       <div className="flex items-center bg-[#0B1120]/50 hover:bg-[#0B1120]/60 rounded-xl h-14 px-4 group transition-colors border border-white/10 focus-within:border-[#3898FF]/30">
-                        <CalendarIcon className="text-white/90 group-hover:text-white w-5 h-5 transition-colors flex-shrink-0" />
-                        <DatePicker
-                          selected={checkIn}
-                          onChange={handleCheckInChange}
-                          className="bg-transparent border-none focus:outline-none text-white w-full placeholder-white/70 text-base ml-3 cursor-pointer"
-                          dateFormat="dd-MM-yy"
-                          placeholderText="Check-in"
-                          minDate={new Date()}
-                          showPopperArrow={false}
+                        <input
+                          type="date"
+                          value={checkIn ? checkIn.toISOString().split('T')[0] : ''}
+                          onChange={(e) => {
+                            const date = new Date(e.target.value);
+                            handleCheckInChange(date);
+                          }}
+                          min={new Date().toISOString().split('T')[0]}
+                          className="bg-transparent border-none focus:outline-none text-white w-full placeholder-white/70 text-base"
+                          placeholder="Check-in date"
                         />
                       </div>
 
                       {/* Check-out Date */}
                       <div className="flex items-center bg-[#0B1120]/50 hover:bg-[#0B1120]/60 rounded-xl h-14 px-4 group transition-colors border border-white/10 focus-within:border-[#3898FF]/30">
-                        <CalendarIcon className="text-white/90 group-hover:text-white w-5 h-5 transition-colors flex-shrink-0" />
-                        <DatePicker
-                          selected={checkOut}
-                          onChange={handleCheckOutChange}
-                          className="bg-transparent border-none focus:outline-none text-white w-full placeholder-white/70 text-base ml-3 cursor-pointer"
-                          dateFormat="dd-MM-yy"
-                          placeholderText="Check-out"
-                          minDate={checkIn || new Date()}
-                          showPopperArrow={false}
+                        <input
+                          type="date"
+                          value={checkOut ? checkOut.toISOString().split('T')[0] : ''}
+                          onChange={(e) => {
+                            const date = new Date(e.target.value);
+                            handleCheckOutChange(date);
+                          }}
+                          min={checkIn ? checkIn.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
+                          className="bg-transparent border-none focus:outline-none text-white w-full placeholder-white/70 text-base"
+                          placeholder="Check-out date"
                         />
                       </div>
 

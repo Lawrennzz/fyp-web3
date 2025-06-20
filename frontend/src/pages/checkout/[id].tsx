@@ -11,6 +11,7 @@ import HotelBookingABI from '../../contracts/HotelBooking.json';
 import TestUSDTABI from '../../contracts/TestUSDT.json';
 import { useFirebase } from '../../contexts/FirebaseContext';
 import { addDoc, collection, Timestamp } from 'firebase/firestore';
+import { config } from '../../config';
 
 interface CheckoutProps {}
 
@@ -90,17 +91,20 @@ export default function Checkout({}: CheckoutProps) {
     try {
       setProcessingPayment(true);
 
-      // Get contract addresses
-      const hotelBookingAddress = process.env.NEXT_PUBLIC_HOTEL_BOOKING_ADDRESS;
-      const usdtAddress = process.env.NEXT_PUBLIC_TEST_USDT_ADDRESS;
+      // Get contract addresses from config
+      const hotelBookingAddress = config.HOTEL_BOOKING_CONTRACT;
+      const usdtAddress = config.USDT_CONTRACT;
 
       if (!hotelBookingAddress || !usdtAddress) {
         throw new Error('Contract addresses not found');
       }
 
-      // Get contract instances
-      const hotelContract = await getContract(hotelBookingAddress, HotelBookingABI.abi, provider);
-      const usdtContract = await getContract(usdtAddress, TestUSDTABI.abi, provider);
+      // Get signer
+      const signer = provider.getSigner();
+
+      // Get contract instances with signer
+      const hotelContract = new ethers.Contract(hotelBookingAddress, HotelBookingABI.abi, signer);
+      const usdtContract = new ethers.Contract(usdtAddress, TestUSDTABI.abi, signer);
 
       // Convert total price to wei (assuming price is in USDT with 6 decimals)
       const totalPriceWei = ethers.utils.parseUnits(totalPrice as string, 6);
@@ -110,18 +114,20 @@ export default function Checkout({}: CheckoutProps) {
       const approveReceipt = await approveTx.wait();
 
       // Call the smart contract to process the booking
-      const tx = await hotelContract.bookRoom(
-        hotelId as string,
-        roomId as string,
-        new Date(checkIn as string).getTime() / 1000,
-        new Date(checkOut as string).getTime() / 1000,
-        Number(guests),
-        totalPriceWei,
+      console.log('Starting booking process with contract...');
+      const tx = await hotelContract.createBooking(
+        ethers.BigNumber.from(String(Date.now())),
+        ethers.BigNumber.from(String(Date.now() + 1)),
+        Math.floor(new Date(checkIn as string).getTime() / 1000),
+        Math.floor(new Date(checkOut as string).getTime() / 1000),
         { gasLimit: 500000 }
       );
 
+      console.log('Transaction sent:', tx.hash);
+
       // Wait for transaction to be mined
       const receipt = await tx.wait();
+      console.log('Transaction confirmed:', receipt);
 
       // Store booking information in Firebase
       const bookingData = {
@@ -153,15 +159,81 @@ export default function Checkout({}: CheckoutProps) {
           type: room.type,
           pricePerNight: room.pricePerNight,
           amenities: room.amenities
+        },
+        blockchainIds: {
+          hotelId: String(Date.now()),
+          roomId: String(Date.now() + 1)
         }
       };
 
-      await addDoc(collection(db, 'bookings'), bookingData);
+      console.log('Storing booking data in Firebase:', bookingData);
 
-      // Redirect to bookings page
-      router.push('/bookings');
+      try {
+        const bookingRef = await addDoc(collection(db, 'bookings'), bookingData);
+        console.log('Booking stored in Firebase with ID:', bookingRef.id);
+
+        // Also store payment information
+        const paymentData = {
+          amount: Number(totalPrice),
+          bookingId: bookingRef.id,
+          currency: "USDT",
+          guestAddress: account.toLowerCase(),
+          metadata: {
+            checkInDate: new Date(checkIn as string).toISOString().split('T')[0],
+            checkOutDate: new Date(checkOut as string).toISOString().split('T')[0],
+            hotelId: hotelId as string,
+            roomId: roomId as string
+          },
+          paymentMethod: "crypto",
+          status: "confirmed",
+          transactionHash: receipt.transactionHash,
+          createdAt: Timestamp.now()
+        };
+
+        console.log('Storing payment data in Firebase:', paymentData);
+        await addDoc(collection(db, 'payments'), paymentData);
+        console.log('Payment data stored in Firebase');
+
+        // Wait a moment before redirecting to ensure data is saved
+        setTimeout(() => {
+          router.push('/bookings');
+        }, 2000);
+      } catch (dbError) {
+        console.error('Error storing data in Firebase:', dbError);
+        alert('Booking confirmed but there was an error saving the details. Please try again or contact support.');
+        // Still redirect since blockchain transaction was successful
+        router.push('/bookings');
+      }
     } catch (error: any) {
       console.error('Payment error:', error);
+
+      // If the error is from the contract call
+      if (error.code === 'CALL_EXCEPTION' || error.code === 4001) {
+        // Store failed payment information
+        const failedPaymentData = {
+          amount: Number(totalPrice),
+          bookingId: `TG-${Date.now()}`,
+          currency: "USDT",
+          guestAddress: account.toLowerCase(),
+          metadata: {
+            checkInDate: new Date(checkIn as string).toISOString().split('T')[0],
+            checkOutDate: new Date(checkOut as string).toISOString().split('T')[0],
+            hotelId: hotelId as string,
+            roomId: roomId as string
+          },
+          paymentMethod: "crypto",
+          status: "failed",
+          error: error.message || 'Contract call failed',
+          createdAt: Timestamp.now()
+        };
+
+        try {
+          await addDoc(collection(db, 'payments'), failedPaymentData);
+        } catch (dbError) {
+          console.error('Error storing failed payment data:', dbError);
+        }
+      }
+
       alert(error.message || 'Failed to process payment. Please try again.');
     } finally {
       setProcessingPayment(false);

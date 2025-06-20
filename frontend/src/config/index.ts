@@ -1,7 +1,7 @@
 export const config = {
-  // Contract addresses
-  HOTEL_BOOKING_CONTRACT: '0x5FbDB2315678afecb367f032d93F642f64180aa3', // This will be updated after deployment
-  USDT_CONTRACT: '0x259a4EFe4Ca2e33E3C088835E4167D4100', // This will be updated after deployment
+  // Contract addresses - using newly deployed Ganache addresses
+  HOTEL_BOOKING_CONTRACT: '0x497ad272F24bd12841d552A9369a5C1480B9A0D6',
+  USDT_CONTRACT: '0x30B5Ce3B7a755Fb1Bdcaf1074DA1646A23213f91',
   
   // Network configuration
   NETWORK_ID: 1337, // Ganache Network
