@@ -2,355 +2,160 @@ const mongoose = require('mongoose');
 const Hotel = require('./models/Hotel');
 const config = require('./config');
 
-// Standardized amenities list
-const standardAmenities = [
-  'WiFi',
-  'Pool',
-  'Restaurant',
-  'Gym',
-  'Spa & Wellness',
-  'Parking',
-  'Kids-friendly',
-  'Room Service',
-  'Pet-friendly',
-  'Bar'
-];
-
-// Standard room types with their configurations
-const standardRooms = [
-  {
-    type: "Deluxe Room",
-    description: "Spacious room with city views",
-    beds: {
-      count: 1,
-      type: "King"
-    },
-    price: 300,
-    available: true,
-    amenities: ["WiFi", "Room Service", "Mini Bar", "Smart TV"],
-    maxGuests: 2,
-    images: [
-      {
-        url: "https://images.unsplash.com/photo-1566665797739-1674de7a421a",
-        alt: "Deluxe Room"
-      }
-    ]
-  },
-  {
-    type: "Executive Suite",
-    description: "Luxury suite with separate living area",
-    beds: {
-      count: 1,
-      type: "King"
-    },
-    price: 450,
-    available: true,
-    amenities: ["WiFi", "Room Service", "Mini Bar", "Smart TV", "Lounge Access"],
-    maxGuests: 2,
-    images: [
-      {
-        url: "https://images.unsplash.com/photo-1590490360182-c33d57733427",
-        alt: "Executive Suite"
-      }
-    ]
-  },
-  {
-    type: "Family Room",
-    description: "Perfect for families with children",
-    beds: {
-      count: 2,
-      type: "Queen"
-    },
-    price: 400,
-    available: true,
-    amenities: ["WiFi", "Room Service", "Mini Bar", "Smart TV", "Kids Area"],
-    maxGuests: 4,
-    images: [
-      {
-        url: "https://images.unsplash.com/photo-1566665797739-1674de7a421a",
-        alt: "Family Room"
-      }
-    ]
-  },
-  {
-    type: "Presidential Suite",
-    description: "Ultimate luxury with panoramic views",
-    beds: {
-      count: 1,
-      type: "King"
-    },
-    price: 800,
-    available: true,
-    amenities: ["WiFi", "Room Service", "Mini Bar", "Smart TV", "Private Butler", "Jacuzzi"],
-    maxGuests: 2,
-    images: [
-      {
-        url: "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b",
-        alt: "Presidential Suite"
-      }
-    ]
-  }
-];
-
-const sampleHotels = [
-  {
-    name: "The Ritz-Carlton",
-    description: "Luxury hotel with stunning views and world-class service",
-    location: {
-      city: "London",
-      country: "United Kingdom",
-      address: "150 Piccadilly, St. James's",
-      coordinates: {
-        lat: 51.5074,
-        lng: -0.1278
-      }
-    },
-    images: [
-      {
-        url: "https://images.unsplash.com/photo-1566073771259-6a8506099945",
-        alt: "Ritz-Carlton Exterior"
-      }
-    ],
-    rooms: [
-      {
-        ...standardRooms[0],
-        price: 500
-      },
-      {
-        ...standardRooms[1],
-        price: 750
-      },
-      {
-        ...standardRooms[3],
-        price: 1200
-      }
-    ],
-    pricePerNight: 500,
-    rating: 9.5,
-    stars: 5,
-    amenities: ["WiFi", "Pool", "Spa & Wellness", "Restaurant", "Bar"],
-    maxGuests: 4
-  },
-  {
-    name: "Four Seasons Hotel",
-    description: "Contemporary luxury in the heart of Dublin",
-    location: {
-      city: "Dublin",
-      country: "Ireland",
-      address: "Simmonscourt Road",
-      coordinates: {
-        lat: 53.3498,
-        lng: -6.2603
-      }
-    },
-    images: [
-      {
-        url: "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb",
-        alt: "Four Seasons Exterior"
-      }
-    ],
-    rooms: [
-      {
-        ...standardRooms[0],
-        price: 450
-      },
-      {
-        ...standardRooms[1],
-        price: 650
-      },
-      {
-        ...standardRooms[2],
-        price: 550
-      }
-    ],
-    pricePerNight: 450,
-    rating: 9.2,
-    stars: 5,
-    amenities: ["WiFi", "Pool", "Gym", "Restaurant", "Bar", "Spa & Wellness"],
-    maxGuests: 3
-  },
-  {
-    name: "Shangri-La Bosphorus",
-    description: "Elegant luxury hotel with Bosphorus views",
-    location: {
-      city: "Istanbul",
-      country: "Turkey",
-      address: "Sinanpaşa Mah",
-      coordinates: {
-        lat: 41.0082,
-        lng: 28.9784
-      }
-    },
-    images: [
-      {
-        url: "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa",
-        alt: "Shangri-La Exterior"
-      }
-    ],
-    rooms: [
-      {
-        ...standardRooms[0],
-        price: 400
-      },
-      {
-        ...standardRooms[1],
-        price: 600
-      },
-      {
-        ...standardRooms[2],
-        price: 500
-      }
-    ],
-    pricePerNight: 400,
-    rating: 9.0,
-    stars: 5,
-    amenities: ["WiFi", "Pool", "Spa & Wellness", "Restaurant"],
-    maxGuests: 4
-  },
-  {
-    name: "Le Royal Monceau",
-    description: "Artistic luxury hotel near the Champs-Élysées",
-    location: {
-      city: "Paris",
-      country: "France",
-      address: "37 Avenue Hoche",
-      coordinates: {
-        lat: 48.8566,
-        lng: 2.3522
-      }
-    },
-    images: [
-      {
-        url: "https://images.unsplash.com/photo-1564501049412-61c2a3083791",
-        alt: "Le Royal Monceau Exterior"
-      }
-    ],
-    rooms: [
-      {
-        ...standardRooms[0],
-        price: 600
-      },
-      {
-        ...standardRooms[1],
-        price: 850
-      },
-      {
-        ...standardRooms[3],
-        price: 1500
-      }
-    ],
-    pricePerNight: 600,
-    rating: 9.3,
-    stars: 5,
-    amenities: ["WiFi", "Pool", "Spa & Wellness", "Restaurant", "Bar"],
-    maxGuests: 3
-  },
-  {
-    name: "Mandarin Oriental",
-    description: "Contemporary luxury with Asian influences",
-    location: {
-      city: "London",
-      country: "United Kingdom",
-      address: "66 Knightsbridge",
-      coordinates: {
-        lat: 51.5074,
-        lng: -0.1278
-      }
-    },
-    images: [
-      {
-        url: "https://images.unsplash.com/photo-1561501900-3701fa6a0864",
-        alt: "Mandarin Oriental Exterior"
-      }
-    ],
-    rooms: [
-      {
-        ...standardRooms[0],
-        price: 550
-      },
-      {
-        ...standardRooms[1],
-        price: 750
-      },
-      {
-        ...standardRooms[2],
-        price: 650
-      }
-    ],
-    pricePerNight: 550,
-    rating: 9.4,
-    stars: 5,
-    amenities: ["WiFi", "Pool", "Spa & Wellness", "Restaurant"],
-    maxGuests: 4
-  },
-  {
-    name: "The Merrion Hotel",
-    description: "Classic luxury in Georgian Dublin",
-    location: {
-      city: "Dublin",
-      country: "Ireland",
-      address: "Upper Merrion Street",
-      coordinates: {
-        lat: 53.3498,
-        lng: -6.2603
-      }
-    },
-    images: [
-      {
-        url: "https://images.unsplash.com/photo-1566073771259-6a8506099945",
-        alt: "Merrion Hotel Exterior"
-      }
-    ],
-    rooms: [
-      {
-        ...standardRooms[0],
-        price: 400
-      },
-      {
-        ...standardRooms[1],
-        price: 600
-      },
-      {
-        ...standardRooms[2],
-        price: 500
-      }
-    ],
-    pricePerNight: 400,
-    rating: 9.1,
-    stars: 5,
-    amenities: ["WiFi", "Pool", "Spa & Wellness", "Restaurant", "Bar"],
-    maxGuests: 3
-  }
-];
-
 const seedDatabase = async () => {
   try {
-    // Connect to MongoDB
-    await mongoose.connect(config.mongoURI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
-    });
+    await mongoose.connect(config.mongoURI);
     console.log('Connected to MongoDB for seeding');
 
     // Clear existing data
     await Hotel.deleteMany({});
     console.log('Cleared existing hotels');
-    
-    // Insert sample hotels
-    const hotels = await Hotel.insertMany(sampleHotels);
-    
-    console.log(`Successfully seeded ${hotels.length} hotels`);
-    
-    // Close the connection
+
+    const hotels = [
+      {
+        name: "The Ritz-Carlton",
+        description: "Luxury hotel with stunning views and world-class service",
+        location: {
+          city: "London",
+          country: "United Kingdom",
+          address: "150 Piccadilly, St. James's",
+          coordinates: {
+            lat: 51.5074,
+            lng: -0.1278
+          }
+        },
+        image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80",
+        images: [
+          "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80",
+          "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80",
+          "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=800&q=80"
+        ],
+        rating: 9.5,
+        amenities: ["WiFi", "Pool", "Spa & Wellness", "Restaurant", "Bar", "Parking"],
+        rooms: [
+          {
+            type: "Deluxe Room",
+            description: "Spacious room with city views",
+            pricePerNight: 500,
+            maxGuests: 2,
+            amenities: ["WiFi", "Room Service", "Mini Bar", "Smart TV"],
+            images: [
+              "https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=800&q=80",
+              "https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=800&q=80"
+            ]
+          },
+          {
+            type: "Executive Suite",
+            description: "Luxury suite with separate living area",
+            pricePerNight: 750,
+            maxGuests: 2,
+            amenities: ["WiFi", "Room Service", "Mini Bar", "Smart TV", "Lounge Access"],
+            images: [
+              "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80",
+              "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80"
+            ]
+          }
+        ]
+      },
+      {
+        name: "Mandarin Oriental",
+        description: "Contemporary luxury hotel with exceptional service",
+        location: {
+          city: "London",
+          country: "United Kingdom",
+          address: "66 Knightsbridge",
+          coordinates: {
+            lat: 51.5027,
+            lng: -0.1608
+          }
+        },
+        image: "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80",
+        images: [
+          "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80",
+          "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=800&q=80"
+        ],
+        rating: 9.3,
+        amenities: ["WiFi", "Pool", "Spa & Wellness", "Restaurant", "Bar", "Gym"],
+        rooms: [
+          {
+            type: "Deluxe Room",
+            description: "Elegant room with city views",
+            pricePerNight: 600,
+            maxGuests: 2,
+            amenities: ["WiFi", "Room Service", "Mini Bar", "Smart TV"],
+            images: [
+              "https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=800&q=80",
+              "https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=800&q=80"
+            ]
+          },
+          {
+            type: "Premier Suite",
+            description: "Spacious suite with panoramic views",
+            pricePerNight: 900,
+            maxGuests: 3,
+            amenities: ["WiFi", "Room Service", "Mini Bar", "Smart TV", "Lounge Access", "Butler Service"],
+            images: [
+              "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80",
+              "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80"
+            ]
+          }
+        ]
+      },
+      {
+        name: "Le Royal Monceau",
+        description: "Luxury Parisian hotel with artistic flair",
+        location: {
+          city: "Paris",
+          country: "France",
+          address: "37 Avenue Hoche",
+          coordinates: {
+            lat: 48.8747,
+            lng: 2.3008
+          }
+        },
+        image: "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=800&q=80",
+        images: [
+          "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=800&q=80",
+          "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80"
+        ],
+        rating: 9.4,
+        amenities: ["WiFi", "Pool", "Spa & Wellness", "Restaurant", "Bar", "Art Gallery"],
+        rooms: [
+          {
+            type: "Studio Room",
+            description: "Contemporary room with artistic touches",
+            pricePerNight: 550,
+            maxGuests: 2,
+            amenities: ["WiFi", "Room Service", "Mini Bar", "Smart TV", "Art Books"],
+            images: [
+              "https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=800&q=80",
+              "https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=800&q=80"
+            ]
+          },
+          {
+            type: "Signature Suite",
+            description: "Luxurious suite with Parisian elegance",
+            pricePerNight: 850,
+            maxGuests: 3,
+            amenities: ["WiFi", "Room Service", "Mini Bar", "Smart TV", "Private Terrace"],
+            images: [
+              "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80",
+              "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80"
+            ]
+          }
+        ]
+      }
+    ];
+
+    await Hotel.insertMany(hotels);
+    console.log('Successfully seeded 3 hotels');
+
     await mongoose.connection.close();
     console.log('Database connection closed');
-    
-    process.exit(0);
   } catch (error) {
     console.error('Error seeding database:', error);
     process.exit(1);
   }
 };
 
-// Run the seeding function
 seedDatabase(); 

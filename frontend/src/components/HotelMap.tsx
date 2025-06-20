@@ -11,16 +11,30 @@ interface Location {
   country: string;
 }
 
+interface Room {
+  type: string;
+  description: string;
+  pricePerNight: number;
+  maxGuests: number;
+  amenities: string[];
+  images: string[];
+}
+
 interface Hotel {
   _id: string;
   name: string;
   location: Location;
-  price: number;
+  description: string;
+  image: string;
+  images: string[];
+  rating: number;
+  amenities: string[];
+  rooms: Room[];
 }
 
 interface HotelMapProps {
   hotels: Hotel[];
-  onHotelSelect?: (hotelId: string) => void;
+  onHotelClick: (hotelId: string) => void;
 }
 
 const containerStyle = {
@@ -116,7 +130,9 @@ const darkModeMapStyle = [
   },
 ];
 
-export default function HotelMap({ hotels, onHotelSelect }: HotelMapProps) {
+const GOOGLE_MAPS_API_KEY = 'AIzaSyB5iES0hDI9jsaWtVwaE7BON4WQq15LIXI';
+
+export default function HotelMap({ hotels, onHotelClick }: HotelMapProps) {
   const [selectedHotel, setSelectedHotel] = useState<Hotel | null>(null);
 
   // Filter hotels that have valid coordinates
@@ -167,7 +183,7 @@ export default function HotelMap({ hotels, onHotelSelect }: HotelMapProps) {
   }
 
   return (
-    <LoadScript googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
+    <LoadScript googleMapsApiKey={GOOGLE_MAPS_API_KEY}>
       <GoogleMap
         mapContainerStyle={containerStyle}
         center={getMapCenter()}
@@ -186,9 +202,7 @@ export default function HotelMap({ hotels, onHotelSelect }: HotelMapProps) {
             position={hotel.location.coordinates!}
             onClick={() => {
               setSelectedHotel(hotel);
-              if (onHotelSelect) {
-                onHotelSelect(hotel._id);
-              }
+              onHotelClick(hotel._id);
             }}
           />
         ))}
@@ -198,13 +212,13 @@ export default function HotelMap({ hotels, onHotelSelect }: HotelMapProps) {
             position={selectedHotel.location.coordinates}
             onCloseClick={() => setSelectedHotel(null)}
           >
-            <div className="bg-white p-2 rounded-lg shadow-lg">
-              <h3 className="font-semibold text-gray-900">{selectedHotel.name}</h3>
-              <p className="text-gray-600 text-sm">
-                {selectedHotel.location.address}, {selectedHotel.location.city}, {selectedHotel.location.country}
+            <div className="bg-white p-4 rounded-lg max-w-xs">
+              <h3 className="text-lg font-semibold mb-2">{selectedHotel.name}</h3>
+              <p className="text-gray-600 text-sm mb-2">
+                {selectedHotel.location.address}, {selectedHotel.location.city}
               </p>
-              <p className="text-blue-600 font-semibold mt-1">
-                ${selectedHotel.price} per night
+              <p className="text-blue-600 font-semibold">
+                From ${Math.min(...selectedHotel.rooms.map(room => room.pricePerNight))} per night
               </p>
             </div>
           </InfoWindow>

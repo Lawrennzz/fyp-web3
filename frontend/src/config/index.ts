@@ -11,7 +11,7 @@ export const config = {
   CHAIN_DECIMALS: 18,
   
   // API endpoints
-  API_URL: 'http://localhost:3003/api',
+  API_URL: 'http://localhost:3001',
   
   // Currency
   DEFAULT_CURRENCY: 'USDT',

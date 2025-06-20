@@ -1,128 +1,87 @@
 const mongoose = require('mongoose');
 
 const roomSchema = new mongoose.Schema({
-  type: { type: String, required: true },
-  description: { type: String },
-  beds: {
-    count: { type: Number, required: true, min: 1 },
-    type: { type: String, required: true }
-  },
-  price: { type: Number, required: true, min: 0 },
-  available: { type: Boolean, default: true },
-  amenities: [{ type: String }],
-  maxGuests: { type: Number, required: true, min: 1 },
-  images: [{
-    url: { type: String, required: true },
-    alt: String
-  }]
-});
-
-const hotelSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  description: {
+  type: {
     type: String,
     required: true
   },
-  location: {
-    city: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    country: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    address: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    coordinates: {
-      lat: Number,
-      lng: Number
-    }
-  },
-  images: [{
-    url: {
-      type: String,
-      required: true
-    },
-    alt: String
-  }],
-  rooms: [roomSchema],
+  description: String,
   pricePerNight: {
     type: Number,
-    required: true,
-    min: 0
-  },
-  rating: {
-    type: Number,
-    required: true,
-    min: 1,
-    max: 10,
-    default: 1
-  },
-  stars: {
-    type: Number,
-    required: true,
-    min: 1,
-    max: 5
-  },
-  amenities: [{
-    type: String,
     required: true
-  }],
+  },
   maxGuests: {
     type: Number,
-    required: true,
-    min: 1
+    required: true
   },
-  reviews: [{
-    user: {
-      type: String,
-      required: true
-    },
-    rating: {
-      type: Number,
-      required: true,
-      min: 1,
-      max: 5
-    },
-    comment: String,
-    date: {
-      type: Date,
-      default: Date.now
-    }
-  }],
+  amenities: [String],
+  images: [String],
   bookings: [{
-    roomId: { type: mongoose.Schema.Types.ObjectId, required: true },
     checkIn: Date,
     checkOut: Date,
     guests: Number,
+    guestAddress: String,
+    totalPrice: Number,
+    transactionHash: String,
     status: {
       type: String,
       enum: ['pending', 'confirmed', 'cancelled'],
       default: 'pending'
     }
   }]
-}, {
-  timestamps: true
 });
 
-// Add indexes for common queries
+const hotelSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true
+  },
+  description: String,
+  location: {
+    city: String,
+    country: String,
+    address: String,
+    coordinates: {
+      lat: Number,
+      lng: Number
+    }
+  },
+  image: String,
+  images: [String],
+  rating: {
+    type: Number,
+    min: 0,
+    max: 10,
+    default: 0
+  },
+  amenities: [String],
+  rooms: [roomSchema]
+});
+
+// Create indexes for search
 hotelSchema.index({ 'location.city': 1, 'location.country': 1 });
-hotelSchema.index({ pricePerNight: 1 });
 hotelSchema.index({ rating: -1 });
-hotelSchema.index({ stars: -1 });
-hotelSchema.index({ amenities: 1 });
-hotelSchema.index({ maxGuests: 1 });
-hotelSchema.index({ 'rooms.price': 1 });
-hotelSchema.index({ 'rooms.available': 1 });
+hotelSchema.index({ 'rooms.pricePerNight': 1 });
+hotelSchema.index({ 'rooms.maxGuests': 1 });
+
+// Method to check room availability
+roomSchema.methods.isAvailableForDates = function(checkIn, checkOut) {
+  if (!this.bookings || this.bookings.length === 0) return true;
+  
+  return !this.bookings.some(booking => {
+    if (booking.status === 'cancelled') return false;
+    
+    const bookingStart = new Date(booking.checkIn);
+    const bookingEnd = new Date(booking.checkOut);
+    const requestStart = new Date(checkIn);
+    const requestEnd = new Date(checkOut);
+    
+    return (
+      (requestStart >= bookingStart && requestStart < bookingEnd) ||
+      (requestEnd > bookingStart && requestEnd <= bookingEnd) ||
+      (requestStart <= bookingStart && requestEnd >= bookingEnd)
+    );
+  });
+};
 
 module.exports = mongoose.model('Hotel', hotelSchema); 

@@ -20,6 +20,7 @@ interface Hotel {
   rating: number;
   image: string;
   description: string;
+  rooms: { pricePerNight: number }[];
 }
 
 export default function Home() {
@@ -40,15 +41,21 @@ export default function Home() {
   useEffect(() => {
     const checkBackendStatus = async () => {
       try {
-        const response = await fetch(`${BACKEND_URL}/api/hotels`);
+        const response = await fetch(`${BACKEND_URL}/api/health`);
         if (response.ok) {
           setBackendStatus('connected');
-          const data = await response.json();
-          setFeaturedHotels(data.slice(0, 6)); // Show first 6 hotels as featured
-          setError(null);
+          // Fetch hotels separately
+          const hotelsResponse = await fetch(`${BACKEND_URL}/api/hotels`);
+          if (hotelsResponse.ok) {
+            const data = await hotelsResponse.json();
+            setFeaturedHotels(data.slice(0, 6)); // Show first 6 hotels as featured
+            setError(null);
+          } else {
+            setError('Failed to fetch hotels');
+          }
         } else {
           setBackendStatus('disconnected');
-          setError('Failed to fetch hotels');
+          setError('Failed to connect to backend');
         }
       } catch (err) {
         setBackendStatus('disconnected');
@@ -142,6 +149,8 @@ export default function Home() {
               fill
               sizes="100vw"
               quality={100}
+              priority
+              fetchpriority="high"
               className="object-cover opacity-60"
               onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                 console.error('Error loading hero image');
@@ -280,47 +289,39 @@ export default function Home() {
         {/* Featured Hotels Section */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <h2 className="text-3xl font-bold mb-8">Featured Hotels</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {featuredHotels.map((hotel) => (
-              <div
-                key={hotel._id}
-                className="bg-[#1E293B] rounded-2xl overflow-hidden hover:shadow-lg transition-shadow"
-              >
-                <div className="relative h-48">
-                  <Image
-                    src={hotel.image}
-                    alt={hotel.name}
-                    fill
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    className="object-cover"
-                  />
-                </div>
-                <div className="p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-xl font-semibold">{hotel.name}</h3>
-                    <div className="flex items-center bg-blue-600 px-2 py-1 rounded-lg">
-                      {renderStars(hotel.rating)}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-16">
+            {featuredHotels.map((hotel) => {
+              const lowestPrice = Math.min(...hotel.rooms.map(room => room.pricePerNight));
+              return (
+                <div
+                  key={hotel._id}
+                  className="bg-[#1E293B] rounded-xl overflow-hidden hover:shadow-xl transition-shadow cursor-pointer group"
+                  onClick={() => router.push(`/hotels/${hotel._id}`)}
+                >
+                  <div className="relative h-48 w-full">
+                    <Image
+                      src={hotel.image}
+                      alt={hotel.name}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    />
+                  </div>
+                  <div className="p-6">
+                    <h3 className="text-xl font-semibold mb-2">{hotel.name}</h3>
+                    <p className="text-gray-400 mb-4">
+                      {hotel.location.city}, {hotel.location.country}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        {renderStars(hotel.rating)}
+                      </div>
+                      <p className="text-2xl font-bold">${lowestPrice}</p>
                     </div>
                   </div>
-                  <p className="text-gray-400 mb-4 flex items-center">
-                    <LocationIcon className="w-4 h-4 mr-2" />
-                    {`${hotel.location.address}, ${hotel.location.city}, ${hotel.location.country}`}
-                  </p>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="text-2xl font-bold">${hotel.price}</p>
-                      <p className="text-sm text-gray-400">per night</p>
-                    </div>
-                    <button
-                      onClick={() => router.push(`/hotels/${hotel._id}`)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-                    >
-                      View Details
-                    </button>
-                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

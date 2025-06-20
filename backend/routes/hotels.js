@@ -63,6 +63,14 @@ const transformHotelForFrontend = (hotel) => {
   if (!hotel) return null;
   
   const hotelObj = hotel.toObject ? hotel.toObject() : { ...hotel };
+
+  // Transform hotel images
+  const transformedImages = (hotelObj.images || []).map(image => {
+    if (typeof image === 'string') {
+      return { url: image, alt: hotelObj.name };
+    }
+    return image;
+  });
   
   return {
     _id: hotelObj._id.toString(),
@@ -73,10 +81,9 @@ const transformHotelForFrontend = (hotel) => {
       address: hotelObj.location?.address || '',
       coordinates: hotelObj.location?.coordinates || null
     },
-    price: hotelObj.pricePerNight || 0,
     rating: Math.min(5, Math.round((hotelObj.rating || 0) / 2)), // Convert 10-point scale to 5-point scale
-    image: hotelObj.images && hotelObj.images.length > 0 ? hotelObj.images[0].url : '/images/placeholder-hotel.jpg',
-    images: hotelObj.images || [],
+    image: transformedImages.length > 0 ? transformedImages[0].url : '/images/placeholder-hotel.jpg',
+    images: transformedImages,
     description: hotelObj.description || '',
     amenities: hotelObj.amenities || [],
     rooms: (hotelObj.rooms || []).map(room => ({
@@ -84,56 +91,81 @@ const transformHotelForFrontend = (hotel) => {
       type: room.type,
       description: room.description,
       beds: room.beds,
-      price: room.price,
+      pricePerNight: room.pricePerNight,
       available: room.available,
       amenities: room.amenities || [],
       maxGuests: room.maxGuests,
-      images: room.images || []
+      images: (room.images || []).map(image => {
+        if (typeof image === 'string') {
+          return { url: image, alt: `${room.type} view` };
+        }
+        return image;
+      })
     }))
   };
 };
 
-// Get all hotels
+// GET /api/hotels - Get all hotels with optional filters
 router.get('/', async (req, res) => {
   try {
-    const {
-      location,
-      checkIn,
-      checkOut,
-      guests,
-      minPrice,
-      maxPrice,
-    } = req.query;
-
+    const { location, checkIn, checkOut, guests, minPrice, maxPrice, amenities, rating } = req.query;
+    
     let query = {};
-
-    // Apply filters
+    
+    // Location filter (case-insensitive partial match)
     if (location) {
-      query['$or'] = [
-        { 'location.city': new RegExp(location, 'i') },
-        { 'location.country': new RegExp(location, 'i') }
+      query.$or = [
+        { 'location.city': { $regex: location, $options: 'i' } },
+        { 'location.country': { $regex: location, $options: 'i' } }
       ];
     }
-
+    
+    // Price range filter
     if (minPrice || maxPrice) {
-      query.pricePerNight = {};
-      if (minPrice) query.pricePerNight.$gte = Number(minPrice);
-      if (maxPrice) query.pricePerNight.$lte = Number(maxPrice);
+      query['rooms.pricePerNight'] = {};
+      if (minPrice) query['rooms.pricePerNight'].$gte = Number(minPrice);
+      if (maxPrice) query['rooms.pricePerNight'].$lte = Number(maxPrice);
     }
-
+    
+    // Guest capacity filter
     if (guests) {
-      query.maxGuests = { $gte: Number(guests) };
+      query['rooms.maxGuests'] = { $gte: Number(guests) };
     }
-
+    
+    // Amenities filter
+    if (amenities) {
+      const amenitiesList = amenities.split(',');
+      query.amenities = { $all: amenitiesList };
+    }
+    
+    // Rating filter
+    if (rating) {
+      query.rating = { $gte: Number(rating) };
+    }
+    
     const hotels = await Hotel.find(query)
+      .select('name description location image images rating amenities rooms')
       .sort({ rating: -1 });
-
-    const transformedHotels = hotels.map(transformHotelForFrontend)
-      .filter(hotel => hotel !== null); // Remove any null results
-    res.json(transformedHotels);
+    
+    // If dates are provided, filter available rooms
+    if (checkIn && checkOut) {
+      const filteredHotels = hotels.map(hotel => {
+        const availableRooms = hotel.rooms.filter(room => 
+          room.isAvailableForDates(checkIn, checkOut)
+        );
+        return {
+          ...hotel.toObject(),
+          rooms: availableRooms
+        };
+      }).filter(hotel => hotel.rooms.length > 0);
+      
+      res.json(filteredHotels);
+    } else {
+      res.json(hotels);
+    }
   } catch (error) {
     console.error('Error fetching hotels:', error);
-    res.status(500).json({ message: 'Error fetching hotels' });
+    res.status(500).json({ message: 'Error fetching hotels', error: error.message });
   }
 });
 
@@ -153,21 +185,17 @@ router.get('/featured', async (req, res) => {
   }
 });
 
-// Get a single hotel by ID
+// GET /api/hotels/:id - Get a specific hotel
 router.get('/:id', async (req, res) => {
   try {
     const hotel = await Hotel.findById(req.params.id);
     if (!hotel) {
       return res.status(404).json({ message: 'Hotel not found' });
     }
-    const transformedHotel = transformHotelForFrontend(hotel);
-    if (!transformedHotel) {
-      return res.status(404).json({ message: 'Error transforming hotel data' });
-    }
-    res.json(transformedHotel);
+    res.json(hotel);
   } catch (error) {
     console.error('Error fetching hotel:', error);
-    res.status(500).json({ message: 'Error fetching hotel details' });
+    res.status(500).json({ message: 'Error fetching hotel', error: error.message });
   }
 });
 

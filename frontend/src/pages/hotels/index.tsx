@@ -23,6 +23,15 @@ import {
 import { FaSwimmingPool, FaSpa, FaPaw } from 'react-icons/fa';
 import HotelMap from '../../components/HotelMap';
 
+interface Room {
+  type: string;
+  description: string;
+  pricePerNight: number;
+  maxGuests: number;
+  amenities: string[];
+  images: string[];
+}
+
 interface Hotel {
   _id: string;
   name: string;
@@ -37,9 +46,10 @@ interface Hotel {
   };
   description: string;
   image: string;
+  images: string[];
   rating: number;
-  price: number;
   amenities: string[];
+  rooms: Room[];
 }
 
 // Type the icons as React components
@@ -84,6 +94,15 @@ export default function Hotels() {
     'Parking',
     'Pet-friendly'
   ];
+
+  const renderStars = (rating: number) => {
+    return [...Array(5)].map((_, index) => (
+      <StarIcon
+        key={index}
+        className={`w-4 h-4 ${index < Math.floor(rating / 2) ? 'text-yellow-400' : 'text-gray-400'}`}
+      />
+    ));
+  };
 
   // Function to get tomorrow's date based on a reference date
   const getTomorrow = (date: Date) => {
@@ -181,22 +200,24 @@ export default function Hotels() {
     if (!loading && hotels.length > 0) {
       let filtered = [...hotels];
       
+      // Filter by price range
+      if (priceRange) {
+        filtered = filtered.filter(hotel => {
+          const lowestPrice = Math.min(...hotel.rooms.map(room => room.pricePerNight));
+          return lowestPrice <= priceRange;
+        });
+      }
+
       // Filter by location
       if (searchParams.location) {
         const searchLocation = searchParams.location.toLowerCase();
         filtered = filtered.filter(hotel => 
           hotel.location.city.toLowerCase().includes(searchLocation) ||
-          hotel.location.country.toLowerCase().includes(searchLocation) ||
-          hotel.location.address.toLowerCase().includes(searchLocation)
+          hotel.location.country.toLowerCase().includes(searchLocation)
         );
       }
-      
-      filtered = filtered.filter(hotel => hotel.price <= priceRange);
-      
-      if (selectedStar !== null) {
-        filtered = filtered.filter(hotel => Math.floor(hotel.rating) === selectedStar);
-      }
-      
+
+      // Filter by amenities
       if (selectedAmenities.length > 0) {
         filtered = filtered.filter(hotel => 
           selectedAmenities.every(amenity => 
@@ -204,13 +225,26 @@ export default function Hotels() {
           )
         );
       }
+
+      // Filter by star rating
+      if (selectedStar !== null) {
+        filtered = filtered.filter(hotel => Math.floor(hotel.rating / 2) === selectedStar);
+      }
       
       switch (sortBy) {
         case 'lowToHigh':
-          filtered.sort((a, b) => a.price - b.price);
+          filtered.sort((a, b) => {
+            const aPrice = Math.min(...a.rooms.map(room => room.pricePerNight));
+            const bPrice = Math.min(...b.rooms.map(room => room.pricePerNight));
+            return aPrice - bPrice;
+          });
           break;
         case 'highToLow':
-          filtered.sort((a, b) => b.price - a.price);
+          filtered.sort((a, b) => {
+            const aPrice = Math.min(...a.rooms.map(room => room.pricePerNight));
+            const bPrice = Math.min(...b.rooms.map(room => room.pricePerNight));
+            return bPrice - aPrice;
+          });
           break;
         case 'rating':
           filtered.sort((a, b) => b.rating - a.rating);
@@ -361,6 +395,26 @@ export default function Hotels() {
 
         {/* Search Bar */}
         <div className="container mx-auto px-6 py-4">
+          {/* Star Rating Filter */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-3">Star Rating</h3>
+            <div className="flex gap-3">
+              {[5, 4, 3, 2, 1].map((stars) => (
+                <button
+                  key={stars}
+                  onClick={() => setSelectedStar(selectedStar === stars ? null : stars)}
+                  className={`flex items-center gap-1 px-4 py-2 rounded-lg ${
+                    selectedStar === stars ? 'bg-blue-500 text-white' : 'bg-[#1E293B] text-gray-400'
+                  }`}
+                >
+                  {[...Array(stars)].map((_, index) => (
+                    <StarIcon key={index} className="w-4 h-4 text-yellow-400" />
+                  ))}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="flex gap-4 items-center">
             <div className="flex-1 relative">
               <input
@@ -450,145 +504,83 @@ export default function Hotels() {
           </p>
         </div>
 
+        {/* Hotel List */}
         {viewMode === 'list' ? (
-          <div className="container mx-auto px-6 py-4 flex gap-8">
-            {/* Left Sidebar */}
-            <div className="w-80">
-              {/* Price Range */}
-              <div className="bg-[#1E293B] rounded-lg p-6 mb-6">
-                <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                  Price Range
-                </h3>
-                <input
-                  type="range"
-                  min="0"
-                  max="1000"
-                  value={priceRange}
-                  onChange={(e) => setPriceRange(parseInt(e.target.value))}
-                  className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                />
-                <div className="flex justify-between mt-4">
-                  <span>$0</span>
-                  <span>${priceRange}</span>
-                </div>
+          <div className="container mx-auto px-6 py-8 grid grid-cols-1 gap-8">
+            {loading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto"></div>
+                <p className="mt-4 text-gray-400">Loading hotels...</p>
               </div>
-
-              {/* Star Rating */}
-              <div className="bg-[#1E293B] rounded-lg p-6">
-                <h3 className="text-lg font-semibold mb-6">Star Rating</h3>
-                <div className="space-y-4">
-                  {[5, 4, 3, 2, 1].map(stars => (
-                    <button
-                      key={stars}
-                      onClick={() => setSelectedStar(selectedStar === stars ? null : stars)}
-                      className={`w-full p-3 rounded-lg flex items-center ${
-                        selectedStar === stars ? 'bg-blue-500' : 'bg-[#2D3748]'
-                      } hover:bg-opacity-90 transition-colors`}
-                    >
-                      <div className="flex">
-                        {[...Array(stars)].map((_, i) => (
-                          <StarIcon key={i} className="text-yellow-400 w-5 h-5" />
-                        ))}
+            ) : filteredHotels.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-400">No hotels found matching your criteria.</p>
+              </div>
+            ) : (
+              filteredHotels.map(hotel => {
+                const lowestPrice = Math.min(...hotel.rooms.map(room => room.pricePerNight));
+                return (
+                  <div
+                    key={hotel._id}
+                    className="bg-[#1E293B] rounded-xl overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
+                    onClick={() => handleHotelClick(hotel._id)}
+                  >
+                    <div className="flex flex-col md:flex-row">
+                      <div className="relative h-64 md:h-auto md:w-1/3">
+                        <Image
+                          src={hotel.image}
+                          alt={hotel.name}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 100vw, 33vw"
+                        />
                       </div>
-                      <span className="ml-2">{stars} stars</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Hotel List */}
-            <div className="flex-1">
-              <div className="grid grid-cols-1 gap-6">
-                {loading ? (
-                  <div className="text-center py-12">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto"></div>
-                    <p className="mt-4 text-gray-400">Loading hotels...</p>
-                  </div>
-                ) : filteredHotels.length === 0 ? (
-                  <div className="text-center py-12">
-                    <p className="text-gray-400">No hotels found matching your criteria.</p>
-                  </div>
-                ) : (
-                  filteredHotels.map(hotel => (
-                    <div
-                      key={hotel._id}
-                      id={`hotel-${hotel._id}`}
-                      className="bg-[#1E293B] rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-                      onClick={() => handleHotelClick(hotel._id)}
-                    >
-                      <div className="flex">
-                        <div className="w-1/3 relative h-[250px]">
-                          <Image
-                            src={hotel.image}
-                            alt={hotel.name}
-                            fill
-                            className="object-cover"
-                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 33vw, 25vw"
-                          />
+                      <div className="p-6 md:w-2/3">
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <h3 className="text-2xl font-semibold mb-2">{hotel.name}</h3>
+                            <p className="text-gray-400 flex items-center mb-4">
+                              <LocationIcon className="w-5 h-5 mr-2" />
+                              {hotel.location.address}, {hotel.location.city}, {hotel.location.country}
+                            </p>
+                          </div>
+                          <div className="flex items-center bg-blue-600 px-3 py-1 rounded-lg">
+                            {renderStars(hotel.rating)}
+                          </div>
                         </div>
-                        <div className="w-2/3 p-6">
-                          <div className="flex justify-between items-start mb-4">
-                            <div>
-                              <h3 className="text-xl font-semibold mb-2">{hotel.name}</h3>
-                              <div className="flex items-center text-gray-400 mb-2">
-                                <LocationIcon className="w-5 h-5 mr-2" />
-                                <p>{hotel.location.address}, {hotel.location.city}, {hotel.location.country}</p>
-                              </div>
+                        <div className="flex flex-wrap gap-4 mb-4">
+                          {hotel.amenities.map((amenity, index) => (
+                            <div key={index} className="flex items-center text-gray-400">
+                              {getAmenityIcon(amenity)}
+                              <span className="ml-2">{amenity}</span>
                             </div>
-                            <div className="flex items-center">
-                              <div className="bg-blue-500 text-white px-3 py-1 rounded-full flex items-center">
-                                <StarIcon className="w-4 h-4 mr-1" />
-                                {hotel.rating.toFixed(1)}
-                              </div>
-                            </div>
+                          ))}
+                        </div>
+                        <div className="flex justify-between items-end">
+                          <div>
+                            <p className="text-3xl font-bold">${lowestPrice}</p>
+                            <p className="text-sm text-gray-400">per night</p>
                           </div>
-
-                          <p className="text-gray-400 mb-4 line-clamp-2">{hotel.description}</p>
-
-                          <div className="flex flex-wrap gap-3 mb-4">
-                            {hotel.amenities.map((amenity, index) => (
-                              <div
-                                key={index}
-                                className="flex items-center bg-[#0B1120] px-3 py-1 rounded-full text-sm"
-                              >
-                                {getAmenityIcon(amenity)}
-                                <span className="ml-2">{amenity}</span>
-                              </div>
-                            ))}
-                          </div>
-
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <p className="text-2xl font-bold">${hotel.price}</p>
-                              <p className="text-sm text-gray-400">per night</p>
-                            </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation(); // Prevent triggering the parent div's onClick
-                                handleHotelClick(hotel._id);
-                              }}
-                              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
-                            >
-                              View Details
-                            </button>
-                          </div>
+                          <button
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors"
+                            onClick={() => handleHotelClick(hotel._id)}
+                          >
+                            View Details
+                          </button>
                         </div>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
-            </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         ) : (
-          <div className="container mx-auto px-6 py-4">
-            <div className="bg-[#1E293B] rounded-lg overflow-hidden h-[calc(100vh-300px)] min-h-[600px]">
+          <div className="container mx-auto px-6 py-8">
+            <div className="h-[calc(100vh-200px)] min-h-[600px] rounded-xl overflow-hidden">
               <HotelMap 
                 hotels={filteredHotels} 
-                onHotelSelect={(hotelId) => {
-                  router.push(`/hotels/${hotelId}`);
-                }} 
+                onHotelClick={(hotelId) => handleHotelClick(hotelId)}
               />
             </div>
           </div>
