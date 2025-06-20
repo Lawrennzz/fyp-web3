@@ -39,12 +39,12 @@ interface HotelMapProps {
 
 const containerStyle = {
   width: '100%',
-  height: '100%'
+  height: '600px' // Set a fixed height
 };
 
-// Default center (can be set to a popular tourist destination)
+// Default center (London)
 const defaultCenter = {
-  lat: 51.5074, // London
+  lat: 51.5074,
   lng: -0.1278
 };
 
@@ -130,14 +130,13 @@ const darkModeMapStyle = [
   },
 ];
 
-const GOOGLE_MAPS_API_KEY = 'AIzaSyB5iES0hDI9jsaWtVwaE7BON4WQq15LIXI';
-
 export default function HotelMap({ hotels, onHotelClick }: HotelMapProps) {
   const [selectedHotel, setSelectedHotel] = useState<Hotel | null>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
   // Filter hotels that have valid coordinates
   const hotelsWithCoordinates = hotels.filter(
-    hotel => hotel.location.coordinates?.lat && hotel.location.coordinates?.lng
+    hotel => hotel.location?.coordinates?.lat && hotel.location?.coordinates?.lng
   );
 
   const getMapCenter = useCallback(() => {
@@ -183,47 +182,67 @@ export default function HotelMap({ hotels, onHotelClick }: HotelMapProps) {
   }
 
   return (
-    <LoadScript googleMapsApiKey={GOOGLE_MAPS_API_KEY}>
-      <GoogleMap
-        mapContainerStyle={containerStyle}
-        center={getMapCenter()}
-        zoom={getZoomLevel()}
-        options={{
-          styles: darkModeMapStyle,
-          fullscreenControl: true,
-          streetViewControl: false,
-          mapTypeControl: false,
-          zoomControl: true
-        }}
-      >
-        {hotelsWithCoordinates.map((hotel) => (
-          <Marker
-            key={hotel._id}
-            position={hotel.location.coordinates!}
-            onClick={() => {
-              setSelectedHotel(hotel);
-              onHotelClick(hotel._id);
+    <LoadScript 
+      googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}
+      onLoad={() => setMapLoaded(true)}
+    >
+      <div className="w-full h-[600px] relative">
+        {mapLoaded ? (
+          <GoogleMap
+            mapContainerStyle={containerStyle}
+            center={getMapCenter()}
+            zoom={getZoomLevel()}
+            options={{
+              styles: darkModeMapStyle,
+              fullscreenControl: true,
+              streetViewControl: false,
+              mapTypeControl: false,
+              zoomControl: true
             }}
-          />
-        ))}
-
-        {selectedHotel && selectedHotel.location.coordinates && (
-          <InfoWindow
-            position={selectedHotel.location.coordinates}
-            onCloseClick={() => setSelectedHotel(null)}
           >
-            <div className="bg-white p-4 rounded-lg max-w-xs">
-              <h3 className="text-lg font-semibold mb-2">{selectedHotel.name}</h3>
-              <p className="text-gray-600 text-sm mb-2">
-                {selectedHotel.location.address}, {selectedHotel.location.city}
-              </p>
-              <p className="text-blue-600 font-semibold">
-                From ${Math.min(...selectedHotel.rooms.map(room => room.pricePerNight))} per night
-              </p>
-            </div>
-          </InfoWindow>
+            {hotelsWithCoordinates.map((hotel) => (
+              <Marker
+                key={hotel._id}
+                position={{
+                  lat: hotel.location.coordinates!.lat,
+                  lng: hotel.location.coordinates!.lng
+                }}
+                onClick={() => setSelectedHotel(hotel)}
+              />
+            ))}
+
+            {selectedHotel && (
+              <InfoWindow
+                position={{
+                  lat: selectedHotel.location.coordinates!.lat,
+                  lng: selectedHotel.location.coordinates!.lng
+                }}
+                onCloseClick={() => setSelectedHotel(null)}
+              >
+                <div className="bg-white p-4 rounded-lg max-w-xs">
+                  <h3 className="font-semibold text-gray-900">{selectedHotel.name}</h3>
+                  <p className="text-gray-600 text-sm mt-1">
+                    {selectedHotel.location.address}
+                  </p>
+                  <p className="text-gray-600 text-sm">
+                    {selectedHotel.location.city}, {selectedHotel.location.country}
+                  </p>
+                  <button
+                    onClick={() => onHotelClick(selectedHotel._id)}
+                    className="mt-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 transition-colors"
+                  >
+                    View Details
+                  </button>
+                </div>
+              </InfoWindow>
+            )}
+          </GoogleMap>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#1E293B] rounded-lg">
+            <div className="text-white">Loading map...</div>
+          </div>
         )}
-      </GoogleMap>
+      </div>
     </LoadScript>
   );
 } 

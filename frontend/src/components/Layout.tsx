@@ -181,6 +181,7 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       </nav>
       <main>{children}</main>
+      <BackendStatus />
     </div>
   );
 } 

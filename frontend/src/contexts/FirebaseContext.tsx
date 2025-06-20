@@ -13,7 +13,7 @@ import {
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { getFirestore, Firestore, doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 interface AuthContextType {
@@ -40,8 +40,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Function to update user's lastSignIn
+  const updateUserLastSignIn = async (user: User) => {
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        lastSignIn: serverTimestamp(),
+        email: user.email,
+        provider: user.providerData[0]?.providerId || 'unknown'
+      });
+    } catch (error) {
+      console.error('Error updating lastSignIn:', error);
+    }
+  };
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // Update lastSignIn when user signs in
+        await updateUserLastSignIn(user);
+      }
       setUser(user);
       setLoading(false);
     });
@@ -51,7 +69,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string) => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      await updateUserLastSignIn(result.user);
     } catch (error: any) {
       console.error('Error signing in:', error);
       throw new Error(error.message || 'Failed to sign in');
@@ -79,28 +98,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithGoogle = async () => {
     try {
       const provider = new GoogleAuthProvider();
-      // Add scopes for additional Google APIs if needed
       provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
       provider.addScope('https://www.googleapis.com/auth/userinfo.email');
       
-      // Set custom parameters
       provider.setCustomParameters({
         prompt: 'select_account'
       });
 
-      // Sign in with popup and resolver
       const result = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
       
       if (!result.user) {
         throw new Error('No user data returned from Google sign in');
       }
 
-      // You can handle additional post-sign-in logic here if needed
+      // Update lastSignIn after successful Google sign in
+      await updateUserLastSignIn(result.user);
+
       return result.user;
     } catch (error: any) {
       console.error('Error signing in with Google:', error);
       
-      // Handle specific error cases
       if (error.code === 'auth/popup-blocked') {
         throw new Error('Please enable popups for this website to sign in with Google');
       } else if (error.code === 'auth/popup-closed-by-user') {

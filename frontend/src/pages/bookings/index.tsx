@@ -5,7 +5,7 @@ import Layout from '../../components/Layout';
 import { useWeb3React } from '@web3-react/core';
 import { Web3Provider } from '@ethersproject/providers';
 import { useFirebase } from '../../contexts/FirebaseContext';
-import { collection, query, where, orderBy, getDocs, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, onSnapshot, DocumentData, QuerySnapshot, DocumentSnapshot } from 'firebase/firestore';
 import { format } from 'date-fns';
 
 interface Booking {
@@ -73,27 +73,27 @@ export default function Bookings() {
         const querySnapshot = await getDocs(q);
         console.log('Found bookings:', querySnapshot.size);
 
-        const bookingsData = querySnapshot.docs.map(doc => {
+        const bookingsData = querySnapshot.docs.map((doc: DocumentSnapshot<DocumentData>) => {
           const data = doc.data();
           console.log('Booking data:', data);
           return {
             id: doc.id,
-            userId: data.userId,
-            hotelId: data.hotelId,
-            roomId: data.roomId,
-            hotelName: data.hotelName,
-            roomType: data.roomType,
-            checkIn: data.checkIn,
-            checkOut: data.checkOut,
-            guests: data.guests,
-            totalPrice: data.totalPrice,
-            status: data.status,
-            transactionHash: data.transactionHash,
-            approvalHash: data.approvalHash,
-            createdAt: data.createdAt,
-            hotelDetails: data.hotelDetails,
-            roomDetails: data.roomDetails,
-            guestInfo: data.guestInfo
+            userId: data?.userId,
+            hotelId: data?.hotelId,
+            roomId: data?.roomId,
+            hotelName: data?.hotelName,
+            roomType: data?.roomType,
+            checkIn: data?.checkIn,
+            checkOut: data?.checkOut,
+            guests: data?.guests,
+            totalPrice: data?.totalPrice,
+            status: data?.status,
+            transactionHash: data?.transactionHash,
+            approvalHash: data?.approvalHash,
+            createdAt: data?.createdAt,
+            hotelDetails: data?.hotelDetails,
+            roomDetails: data?.roomDetails,
+            guestInfo: data?.guestInfo
           } as Booking;
         });
 
@@ -116,32 +116,35 @@ export default function Bookings() {
       orderBy('createdAt', 'desc')
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const newBookings = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          userId: data.userId,
-          hotelId: data.hotelId,
-          roomId: data.roomId,
-          hotelName: data.hotelName,
-          roomType: data.roomType,
-          checkIn: data.checkIn,
-          checkOut: data.checkOut,
-          guests: data.guests,
-          totalPrice: data.totalPrice,
-          status: data.status,
-          transactionHash: data.transactionHash,
-          approvalHash: data.approvalHash,
-          createdAt: data.createdAt,
-          hotelDetails: data.hotelDetails,
-          roomDetails: data.roomDetails,
-          guestInfo: data.guestInfo
-        } as Booking;
-      });
-      setBookings(newBookings);
-    }, (error) => {
-      console.error('Error in real-time bookings listener:', error);
+    const unsubscribe = onSnapshot(q, {
+      next: (snapshot: QuerySnapshot<DocumentData>) => {
+        const newBookings = snapshot.docs.map((doc: DocumentSnapshot<DocumentData>) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            userId: data?.userId,
+            hotelId: data?.hotelId,
+            roomId: data?.roomId,
+            hotelName: data?.hotelName,
+            roomType: data?.roomType,
+            checkIn: data?.checkIn,
+            checkOut: data?.checkOut,
+            guests: data?.guests,
+            totalPrice: data?.totalPrice,
+            status: data?.status,
+            transactionHash: data?.transactionHash,
+            approvalHash: data?.approvalHash,
+            createdAt: data?.createdAt,
+            hotelDetails: data?.hotelDetails,
+            roomDetails: data?.roomDetails,
+            guestInfo: data?.guestInfo
+          } as Booking;
+        });
+        setBookings(newBookings);
+      },
+      error: (error: Error) => {
+        console.error('Error in real-time bookings listener:', error);
+      }
     });
 
     // Cleanup subscription
