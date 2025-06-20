@@ -64,20 +64,32 @@ const transformHotelForFrontend = (hotel) => {
   
   const hotelObj = hotel.toObject ? hotel.toObject() : { ...hotel };
   
-  // Format location as a string
-  const locationString = hotelObj.location 
-    ? `${hotelObj.location.city}, ${hotelObj.location.country}`
-    : 'Unknown location';
-
   return {
     _id: hotelObj._id.toString(),
     name: hotelObj.name || '',
-    location: locationString,
+    location: {
+      city: hotelObj.location?.city || '',
+      country: hotelObj.location?.country || '',
+      address: hotelObj.location?.address || '',
+      coordinates: hotelObj.location?.coordinates || null
+    },
     price: hotelObj.pricePerNight || 0,
     rating: Math.min(5, Math.round((hotelObj.rating || 0) / 2)), // Convert 10-point scale to 5-point scale
     image: hotelObj.images && hotelObj.images.length > 0 ? hotelObj.images[0].url : '/images/placeholder-hotel.jpg',
+    images: hotelObj.images || [],
     description: hotelObj.description || '',
-    amenities: hotelObj.amenities || []
+    amenities: hotelObj.amenities || [],
+    rooms: (hotelObj.rooms || []).map(room => ({
+      _id: room._id.toString(),
+      type: room.type,
+      description: room.description,
+      beds: room.beds,
+      price: room.price,
+      available: room.available,
+      amenities: room.amenities || [],
+      maxGuests: room.maxGuests,
+      images: room.images || []
+    }))
   };
 };
 

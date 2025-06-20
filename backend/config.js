@@ -1,12 +1,18 @@
 require('dotenv').config();
 
+const PORT = process.env.PORT || 3001;
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/travel_go';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+
 module.exports = {
-    port: process.env.PORT || 3001,
-    mongoURI: 'mongodb://localhost:27017/travel_go',
+    port: PORT,
+    mongoURI: MONGODB_URI,
     jwtSecret: process.env.JWT_SECRET || 'your-secret-key',
     corsOptions: {
-        origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+        origin: [FRONTEND_URL],
         credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
         optionsSuccessStatus: 200
     },
 
@@ -20,7 +26,7 @@ module.exports = {
     blockchain: {
         network: process.env.BLOCKCHAIN_NETWORK || 'sepolia',
         contractAddress: process.env.CONTRACT_ADDRESS,
-        providerUrl: process.env.PROVIDER_URL || 'http://localhost:8545'
+        providerUrl: process.env.PROVIDER_URL || 'http://localhost:7545'
     },
 
     // Payment configuration

@@ -2,55 +2,89 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const config = require('./config');
 const hotelRoutes = require('./routes/hotels');
+const healthRouter = require('./routes/health');
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/travel_go';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 // Middleware
 app.use(express.json());
-app.use(cors({
-  origin: FRONTEND_URL,
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(cors(config.corsOptions));
 
 // Routes
 app.use('/api/hotels', hotelRoutes);
+app.use('/api/health', healthRouter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Server is running' });
+  res.json({ 
+    status: 'ok', 
+    message: 'Server is running',
+    port: config.port,
+    mongoConnection: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+  });
 });
 
-// Connect to MongoDB
-mongoose.connect(MONGODB_URI)
-  .then(() => {
-    console.log('Connected to MongoDB');
-    app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
-    });
-  })
-  .catch((error) => {
-    console.error('MongoDB connection error:', error);
-    process.exit(1);
+// Connect to MongoDB with detailed error logging
+mongoose.connect(config.mongoURI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 5000 // 5 second timeout
+})
+.then(() => {
+  console.log('Connected to MongoDB successfully');
+  app.listen(config.port, () => {
+    console.log(`Server is running on port ${config.port}`);
   });
+})
+.catch((error) => {
+  console.error('MongoDB connection error:', error);
+  console.error('Error details:', {
+    name: error.name,
+    message: error.message,
+    code: error.code,
+    stack: error.stack
+  });
+  process.exit(1);
+});
 
-// Error handling middleware
+// Error handling middleware with detailed error information
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!' });
+  console.error('Error details:', {
+    name: err.name,
+    message: err.message,
+    code: err.code,
+    stack: err.stack,
+    path: req.path,
+    method: req.method,
+    query: req.query,
+    body: req.body
+  });
+  
+  res.status(500).json({
+    message: 'Something went wrong!',
+    error: {
+      name: err.name,
+      message: err.message,
+      code: err.code
+    }
+  });
 });
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
-  console.error('Unhandled Promise Rejection:', err);
-  process.exit(1);
+  console.error('Unhandled Promise Rejection:', {
+    name: err.name,
+    message: err.message,
+    code: err.code,
+    stack: err.stack
+  });
+  // Don't exit the process, just log the error
+  // process.exit(1);
 });
 
 module.exports = app; 

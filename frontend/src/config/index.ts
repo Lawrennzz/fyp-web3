@@ -1,14 +1,17 @@
 export const config = {
   // Contract addresses
-  HOTEL_BOOKING_CONTRACT: '0x197ed06Cb269f1725D456701C0a1A33FAaD124eD',
-  USDT_CONTRACT: '0x259a4EFe4Ca2e33E3C088835E4167D4100',
+  HOTEL_BOOKING_CONTRACT: '0x5FbDB2315678afecb367f032d93F642f64180aa3', // This will be updated after deployment
+  USDT_CONTRACT: '0x259a4EFe4Ca2e33E3C088835E4167D4100', // This will be updated after deployment
   
   // Network configuration
-  NETWORK_ID: 1337, // Ganache
-  RPC_URL: 'http://127.0.0.1:7545',
+  NETWORK_ID: 1337, // Ganache Network
+  RPC_URL: 'http://127.0.0.1:7545', // Ganache default RPC URL
+  CHAIN_NAME: 'Ganache',
+  CHAIN_SYMBOL: 'ETH',
+  CHAIN_DECIMALS: 18,
   
   // API endpoints
-  API_URL: 'http://localhost:3000/api',
+  API_URL: 'http://localhost:3003/api',
   
   // Currency
   DEFAULT_CURRENCY: 'USDT',

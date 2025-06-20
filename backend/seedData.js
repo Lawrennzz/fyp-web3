@@ -16,6 +16,82 @@ const standardAmenities = [
   'Bar'
 ];
 
+// Standard room types with their configurations
+const standardRooms = [
+  {
+    type: "Deluxe Room",
+    description: "Spacious room with city views",
+    beds: {
+      count: 1,
+      type: "King"
+    },
+    price: 300,
+    available: true,
+    amenities: ["WiFi", "Room Service", "Mini Bar", "Smart TV"],
+    maxGuests: 2,
+    images: [
+      {
+        url: "https://images.unsplash.com/photo-1566665797739-1674de7a421a",
+        alt: "Deluxe Room"
+      }
+    ]
+  },
+  {
+    type: "Executive Suite",
+    description: "Luxury suite with separate living area",
+    beds: {
+      count: 1,
+      type: "King"
+    },
+    price: 450,
+    available: true,
+    amenities: ["WiFi", "Room Service", "Mini Bar", "Smart TV", "Lounge Access"],
+    maxGuests: 2,
+    images: [
+      {
+        url: "https://images.unsplash.com/photo-1590490360182-c33d57733427",
+        alt: "Executive Suite"
+      }
+    ]
+  },
+  {
+    type: "Family Room",
+    description: "Perfect for families with children",
+    beds: {
+      count: 2,
+      type: "Queen"
+    },
+    price: 400,
+    available: true,
+    amenities: ["WiFi", "Room Service", "Mini Bar", "Smart TV", "Kids Area"],
+    maxGuests: 4,
+    images: [
+      {
+        url: "https://images.unsplash.com/photo-1566665797739-1674de7a421a",
+        alt: "Family Room"
+      }
+    ]
+  },
+  {
+    type: "Presidential Suite",
+    description: "Ultimate luxury with panoramic views",
+    beds: {
+      count: 1,
+      type: "King"
+    },
+    price: 800,
+    available: true,
+    amenities: ["WiFi", "Room Service", "Mini Bar", "Smart TV", "Private Butler", "Jacuzzi"],
+    maxGuests: 2,
+    images: [
+      {
+        url: "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b",
+        alt: "Presidential Suite"
+      }
+    ]
+  }
+];
+
 const sampleHotels = [
   {
     name: "The Ritz-Carlton",
@@ -33,6 +109,20 @@ const sampleHotels = [
       {
         url: "https://images.unsplash.com/photo-1566073771259-6a8506099945",
         alt: "Ritz-Carlton Exterior"
+      }
+    ],
+    rooms: [
+      {
+        ...standardRooms[0],
+        price: 500
+      },
+      {
+        ...standardRooms[1],
+        price: 750
+      },
+      {
+        ...standardRooms[3],
+        price: 1200
       }
     ],
     pricePerNight: 500,
@@ -59,10 +149,24 @@ const sampleHotels = [
         alt: "Four Seasons Exterior"
       }
     ],
+    rooms: [
+      {
+        ...standardRooms[0],
+        price: 450
+      },
+      {
+        ...standardRooms[1],
+        price: 650
+      },
+      {
+        ...standardRooms[2],
+        price: 550
+      }
+    ],
     pricePerNight: 450,
     rating: 9.2,
     stars: 5,
-    amenities: ["WiFi", "Pool", "Gym", "Restaurant"],
+    amenities: ["WiFi", "Pool", "Gym", "Restaurant", "Bar", "Spa & Wellness"],
     maxGuests: 3
   },
   {
@@ -81,6 +185,20 @@ const sampleHotels = [
       {
         url: "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa",
         alt: "Shangri-La Exterior"
+      }
+    ],
+    rooms: [
+      {
+        ...standardRooms[0],
+        price: 400
+      },
+      {
+        ...standardRooms[1],
+        price: 600
+      },
+      {
+        ...standardRooms[2],
+        price: 500
       }
     ],
     pricePerNight: 400,
@@ -107,6 +225,20 @@ const sampleHotels = [
         alt: "Le Royal Monceau Exterior"
       }
     ],
+    rooms: [
+      {
+        ...standardRooms[0],
+        price: 600
+      },
+      {
+        ...standardRooms[1],
+        price: 850
+      },
+      {
+        ...standardRooms[3],
+        price: 1500
+      }
+    ],
     pricePerNight: 600,
     rating: 9.3,
     stars: 5,
@@ -131,6 +263,20 @@ const sampleHotels = [
         alt: "Mandarin Oriental Exterior"
       }
     ],
+    rooms: [
+      {
+        ...standardRooms[0],
+        price: 550
+      },
+      {
+        ...standardRooms[1],
+        price: 750
+      },
+      {
+        ...standardRooms[2],
+        price: 650
+      }
+    ],
     pricePerNight: 550,
     rating: 9.4,
     stars: 5,
@@ -153,6 +299,20 @@ const sampleHotels = [
       {
         url: "https://images.unsplash.com/photo-1566073771259-6a8506099945",
         alt: "Merrion Hotel Exterior"
+      }
+    ],
+    rooms: [
+      {
+        ...standardRooms[0],
+        price: 400
+      },
+      {
+        ...standardRooms[1],
+        price: 600
+      },
+      {
+        ...standardRooms[2],
+        price: 500
       }
     ],
     pricePerNight: 400,

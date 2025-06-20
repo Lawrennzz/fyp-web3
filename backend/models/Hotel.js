@@ -2,12 +2,19 @@ const mongoose = require('mongoose');
 
 const roomSchema = new mongoose.Schema({
   type: { type: String, required: true },
+  description: { type: String },
   beds: {
     count: { type: Number, required: true, min: 1 },
     type: { type: String, required: true }
   },
   price: { type: Number, required: true, min: 0 },
-  available: { type: Boolean, default: true }
+  available: { type: Boolean, default: true },
+  amenities: [{ type: String }],
+  maxGuests: { type: Number, required: true, min: 1 },
+  images: [{
+    url: { type: String, required: true },
+    alt: String
+  }]
 });
 
 const hotelSchema = new mongoose.Schema({
@@ -48,6 +55,7 @@ const hotelSchema = new mongoose.Schema({
     },
     alt: String
   }],
+  rooms: [roomSchema],
   pricePerNight: {
     type: Number,
     required: true,
@@ -93,6 +101,7 @@ const hotelSchema = new mongoose.Schema({
     }
   }],
   bookings: [{
+    roomId: { type: mongoose.Schema.Types.ObjectId, required: true },
     checkIn: Date,
     checkOut: Date,
     guests: Number,
@@ -113,5 +122,7 @@ hotelSchema.index({ rating: -1 });
 hotelSchema.index({ stars: -1 });
 hotelSchema.index({ amenities: 1 });
 hotelSchema.index({ maxGuests: 1 });
+hotelSchema.index({ 'rooms.price': 1 });
+hotelSchema.index({ 'rooms.available': 1 });
 
 module.exports = mongoose.model('Hotel', hotelSchema); 

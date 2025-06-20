@@ -1,6 +1,6 @@
-import { initializeApp, getApps } from 'firebase/app';
+import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAnalytics, isSupported } from 'firebase/analytics';
-import { getAuth } from 'firebase/auth';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
@@ -15,10 +15,23 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase only if it hasn't been initialized already
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
+let app: FirebaseApp;
+try {
+  app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
+} catch (error) {
+  console.error("Error initializing Firebase:", error);
+  throw error;
+}
 
 // Initialize Firebase services
 const auth = getAuth(app);
+
+// Set persistence and initialize auth settings
+if (typeof window !== 'undefined') {
+  auth.useDeviceLanguage(); // Use the device's language
+}
+
+// Initialize Firestore and Storage
 const db = getFirestore(app);
 const storage = getStorage(app);
 
@@ -29,6 +42,8 @@ if (typeof window !== 'undefined') {
     if (supported) {
       analytics = getAnalytics(app);
     }
+  }).catch(error => {
+    console.error("Error initializing analytics:", error);
   });
 }
 
