@@ -52,12 +52,38 @@ const WalletOption = memo<WalletOptionProps>(({
 
 WalletOption.displayName = 'WalletOption';
 
+const Portal: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [mounted, setMounted] = useState(false);
+  const modalRoot = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      let element = document.getElementById('modal-root');
+      if (!element) {
+        element = document.createElement('div');
+        element.id = 'modal-root';
+        element.className = 'relative z-[9999]';
+        document.body.appendChild(element);
+      }
+      modalRoot.current = element;
+      setMounted(true);
+    }
+
+    return () => {
+      if (modalRoot.current?.parentElement && modalRoot.current.childNodes.length === 0) {
+        modalRoot.current.parentElement.removeChild(modalRoot.current);
+      }
+    };
+  }, []);
+
+  if (!mounted || !modalRoot.current) return null;
+  return createPortal(children, modalRoot.current);
+};
+
 export default function WalletConnect({ isOpen, onClose }: WalletConnectProps) {
   const { connectWallet, isConnecting, error: walletError, walletAddress } = useWalletConnect();
   const { signInWithGoogle, user } = useAuth();
-  const [mounted, setMounted] = useState(false);
   const [activeProvider, setActiveProvider] = useState<WalletProvider | null>(null);
-  const modalRootRef = useRef<HTMLElement | null>(null);
   const [googleError, setGoogleError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const web3React = useWeb3React<Web3Provider>();
@@ -66,21 +92,7 @@ export default function WalletConnect({ isOpen, onClose }: WalletConnectProps) {
   const isMounted = useRef(false);
 
   useEffect(() => {
-    setMounted(true);
     isMounted.current = true;
-    
-    // Find or create modal root
-    if (typeof window !== 'undefined') {
-      let modalRoot = document.getElementById('modal-root');
-      if (!modalRoot) {
-        modalRoot = document.createElement('div');
-        modalRoot.id = 'modal-root';
-        modalRoot.className = 'relative z-50';
-        document.body.appendChild(modalRoot);
-      }
-      modalRootRef.current = modalRoot;
-    }
-
     return () => {
       isMounted.current = false;
     };
@@ -118,15 +130,10 @@ export default function WalletConnect({ isOpen, onClose }: WalletConnectProps) {
         try {
           const user = await signInWithGoogle();
           console.log('Successfully signed in with Google:', user);
-
-          // Then connect MetaMask
-          try {
-            await connectWallet('metamask');
-          } catch (metaMaskErr: any) {
-            console.error('MetaMask connection error after Google sign-in:', metaMaskErr);
-            setGoogleError('Successfully signed in with Google, but failed to connect MetaMask. Please try connecting MetaMask manually.');
-          }
-
+          
+          // Store the provider type
+          localStorage.setItem('lastProvider', 'google');
+          
           onClose();
         } catch (err: any) {
           console.error('Google sign-in error:', err);
@@ -153,12 +160,16 @@ export default function WalletConnect({ isOpen, onClose }: WalletConnectProps) {
           
           // Try to connect MetaMask
           try {
+            // First connect the wallet
+            await connectWallet('metamask');
+            console.log('Wallet connected');
+            
+            // Then activate MetaMask
             await metaMask.activate();
             console.log('MetaMask activated');
             
-            // Then connect the wallet
-            await connectWallet('metamask');
-            console.log('Wallet connected');
+            // Store the provider type
+            localStorage.setItem('lastProvider', 'metamask');
             
             onClose();
           } catch (error: any) {
@@ -172,8 +183,28 @@ export default function WalletConnect({ isOpen, onClose }: WalletConnectProps) {
           console.error('MetaMask error:', error);
           throw error;
         }
+      } else if (provider === 'guest') {
+        try {
+          // Generate a random guest ID
+          const guestId = Math.random().toString(36).substring(2, 15);
+          
+          // Store guest info in localStorage
+          localStorage.setItem('isGuest', 'true');
+          localStorage.setItem('guestId', guestId);
+          localStorage.setItem('lastProvider', 'guest');
+          
+          // Close the modal
+          onClose();
+          
+          // Force reload to update the UI
+          window.location.reload();
+        } catch (error: any) {
+          console.error('Guest mode error:', error);
+          throw error;
+        }
       } else {
         await connectWallet(provider, payload);
+        onClose();
       }
     } catch (err: any) {
       console.error('Connection error:', err);
@@ -196,109 +227,102 @@ export default function WalletConnect({ isOpen, onClose }: WalletConnectProps) {
     }
   }, [isProcessing, onClose]);
 
-  useEffect(() => {
-    // Close modal when user is authenticated
-    if ((walletAddress || user) && isMounted.current) {
-      handleClose();
-    }
-  }, [walletAddress, user, handleClose]);
+  if (!isOpen) return null;
 
-  if (!mounted || !isOpen || !modalRootRef.current) return null;
-
-  const modalContent = (
-    <div 
-      className="fixed inset-0 flex items-center justify-center p-4 z-[9999]"
-      onClick={handleClose}
-    >
+  return (
+    <Portal>
       <div 
-        className="fixed inset-0 bg-black/80 backdrop-blur-sm" 
-      />
-      
-      <div 
-        className="relative bg-[#1c1c1c] rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
-        onClick={e => e.stopPropagation()}
+        className="fixed inset-0 flex items-center justify-center p-4 z-[9999]"
+        onClick={handleClose}
       >
-        <div className="flex justify-between items-center p-6 pb-4">
-          <h2 className="text-2xl font-bold text-white">Sign in</h2>
-          <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-white transition-colors"
-            disabled={isProcessing}
-          >
-            <IoClose size={24} />
-          </button>
-        </div>
-
-        <div className="p-6 pt-2">
-          {(walletError || googleError) && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm">
-              {walletError || googleError}
-            </div>
-          )}
-
-          <WalletOption
-            icon={
-              <Image
-                src="/metamask-fox.svg"
-                alt="MetaMask"
-                width={40}
-                height={40}
-                className="object-contain"
-              />
-            }
-            label="MetaMask"
-            sublabel="Popular"
-            onClick={() => handleConnect('metamask')}
-            isLoading={isProcessing && activeProvider === 'metamask'}
-          />
-
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-700" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="px-4 text-sm text-gray-500 bg-[#1c1c1c]">or</span>
-            </div>
+        <div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm" 
+        />
+        
+        <div 
+          className="relative bg-[#1c1c1c] rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="flex justify-between items-center p-6 pb-4">
+            <h2 className="text-2xl font-bold text-white">Sign in</h2>
+            <button
+              onClick={handleClose}
+              className="text-gray-400 hover:text-white transition-colors"
+              disabled={isProcessing}
+            >
+              <IoClose size={24} />
+            </button>
           </div>
 
-          <WalletOption
-            icon={
-              <Image
-                src="/google-icon.svg"
-                alt="Google"
-                width={40}
-                height={40}
-                className="object-contain"
-              />
-            }
-            label="Continue with Google"
-            onClick={() => handleConnect('google')}
-            isLoading={isProcessing && activeProvider === 'google'}
-          />
-
-          <WalletOption
-            icon={
-              <div className="w-6 h-6 flex items-center justify-center">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-                </svg>
+          <div className="p-6 pt-2">
+            {(walletError || googleError) && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm">
+                {walletError || googleError}
               </div>
-            }
-            label="Continue as guest"
-            onClick={() => handleConnect('guest')}
-            isLoading={isProcessing && activeProvider === 'guest'}
-          />
+            )}
 
-          <div className="mt-6 text-center">
-            <p className="text-xs text-gray-500">
-              Powered by{' '}
-              <span className="font-medium">Travel.go</span>
-            </p>
+            <WalletOption
+              icon={
+                <Image
+                  src="/metamask-fox.svg"
+                  alt="MetaMask"
+                  width={40}
+                  height={40}
+                  className="object-contain"
+                />
+              }
+              label="MetaMask"
+              sublabel="Popular"
+              onClick={() => handleConnect('metamask')}
+              isLoading={isProcessing && activeProvider === 'metamask'}
+            />
+
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-700" />
+              </div>
+              <div className="relative flex justify-center">
+                <span className="px-4 text-sm text-gray-500 bg-[#1c1c1c]">or</span>
+              </div>
+            </div>
+
+            <WalletOption
+              icon={
+                <Image
+                  src="/google-icon.svg"
+                  alt="Google"
+                  width={40}
+                  height={40}
+                  className="object-contain"
+                />
+              }
+              label="Continue with Google"
+              onClick={() => handleConnect('google')}
+              isLoading={isProcessing && activeProvider === 'google'}
+            />
+
+            <WalletOption
+              icon={
+                <div className="w-6 h-6 flex items-center justify-center">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                  </svg>
+                </div>
+              }
+              label="Continue as guest"
+              onClick={() => handleConnect('guest')}
+              isLoading={isProcessing && activeProvider === 'guest'}
+            />
+
+            <div className="mt-6 text-center">
+              <p className="text-xs text-gray-500">
+                Powered by{' '}
+                <span className="font-medium">Travel.go</span>
+              </p>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </Portal>
   );
-
-  return createPortal(modalContent, modalRootRef.current);
 } 

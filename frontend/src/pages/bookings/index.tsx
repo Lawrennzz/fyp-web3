@@ -1,242 +1,214 @@
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
+import Image from 'next/image';
+import Layout from '../../components/Layout';
 import { useWeb3React } from '@web3-react/core';
 import { Web3Provider } from '@ethersproject/providers';
-import Layout from '../../components/Layout';
+import { useFirebase } from '../../contexts/FirebaseContext';
+import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { format } from 'date-fns';
-import { getContract } from '../../utils/web3Config';
-import HotelBookingABI from '../../contracts/HotelBooking.json';
 
-interface BackendBooking {
+interface Booking {
+  id: string;
   hotelId: string;
   roomId: string;
-  checkIn: string;
-  checkOut: string;
+  hotelName: string;
+  roomType: string;
+  checkIn: any;
+  checkOut: any;
+  guests: number;
   totalPrice: number;
+  status: string;
   transactionHash: string;
-  status: 'pending' | 'confirmed' | 'cancelled';
-  hotel: {
+  hotelDetails: {
     name: string;
     location: {
+      address: string;
       city: string;
       country: string;
     };
     image: string;
   };
-}
-
-interface BlockchainBooking {
-  hotelId: string;
-  roomId: string;
-  checkIn: Date;
-  checkOut: Date;
-  totalPrice: number;
-  transactionHash: string;
-  status: 'pending' | 'confirmed' | 'cancelled';
-}
-
-interface Booking extends Omit<BackendBooking, 'checkIn' | 'checkOut'> {
-  checkIn: Date;
-  checkOut: Date;
-  blockchainStatus?: string;
+  roomDetails: {
+    type: string;
+    pricePerNight: number;
+    amenities: string[];
+  };
+  guestInfo: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+  };
 }
 
 export default function Bookings() {
-  const { account, provider } = useWeb3React<Web3Provider>();
+  const router = useRouter();
+  const { account } = useWeb3React<Web3Provider>();
+  const { db } = useFirebase();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (account && provider) {
-      fetchBookings();
-    }
-  }, [account, provider]);
+    if (!account || !db) return;
 
-  const fetchBookings = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Check if user is connected
-      if (!account) {
-        setError('Please connect your wallet to view your bookings.');
-        return;
-      }
-
-      // Fetch bookings from backend first
+    const fetchBookings = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hotels/bookings/${account}`);
-        if (!response.ok) {
-          throw new Error(`Backend error: ${response.status} ${response.statusText}`);
-        }
-        const backendBookings: BackendBooking[] = await response.json();
-        console.log('Backend bookings:', backendBookings);
+        setLoading(true);
+        setError(null);
 
-        // If we have backend bookings, try to fetch blockchain data
-        if (backendBookings.length > 0) {
-          try {
-            // Get contract instance
-            const hotelBookingAddress = process.env.NEXT_PUBLIC_HOTEL_BOOKING_ADDRESS;
-            if (!hotelBookingAddress || !provider) {
-              console.warn('Web3 not fully configured, showing only backend data');
-              setBookings(backendBookings.map(booking => ({
-                ...booking,
-                checkIn: new Date(booking.checkIn),
-                checkOut: new Date(booking.checkOut)
-              })));
-              return;
-            }
+        const bookingsRef = collection(db, 'bookings');
+        const q = query(
+          bookingsRef,
+          where('userId', '==', account.toLowerCase()),
+          orderBy('createdAt', 'desc')
+        );
 
-            const contract = await getContract(hotelBookingAddress, HotelBookingABI, provider);
-            const bookingIds = await contract.getBookingsByUser(account);
-            
-            // Map blockchain bookings to our format
-            const blockchainBookings: BlockchainBooking[] = await Promise.all(
-              bookingIds.map(async (id: string) => {
-                const bookingData = await contract.bookings(id);
-                return {
-                  hotelId: bookingData.hotelId,
-                  roomId: bookingData.roomId,
-                  checkIn: new Date(bookingData.checkIn.toNumber() * 1000),
-                  checkOut: new Date(bookingData.checkOut.toNumber() * 1000),
-                  totalPrice: Number(bookingData.totalPrice),
-                  transactionHash: bookingData.transactionHash,
-                  status: bookingData.status
-                };
-              })
-            );
+        const querySnapshot = await getDocs(q);
+        const bookingsData = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Booking[];
 
-            console.log('Blockchain bookings:', blockchainBookings);
-
-            // Merge backend and blockchain bookings
-            const mergedBookings: Booking[] = backendBookings.map(backendBooking => {
-              const blockchainBooking = blockchainBookings.find(
-                b => b.transactionHash === backendBooking.transactionHash
-              );
-              return {
-                ...backendBooking,
-                checkIn: new Date(backendBooking.checkIn),
-                checkOut: new Date(backendBooking.checkOut),
-                blockchainStatus: blockchainBooking?.status
-              };
-            });
-
-            setBookings(mergedBookings);
-          } catch (blockchainError) {
-            console.error('Blockchain error:', blockchainError);
-            // If blockchain fails, still show backend data
-            setBookings(backendBookings.map(booking => ({
-              ...booking,
-              checkIn: new Date(booking.checkIn),
-              checkOut: new Date(booking.checkOut)
-            })));
-          }
-        } else {
-          // No bookings found
-          setBookings([]);
-        }
-      } catch (backendError) {
-        console.error('Backend error:', backendError);
-        throw new Error('Failed to fetch bookings from the server. Please try again later.');
+        setBookings(bookingsData);
+      } catch (error) {
+        console.error('Error fetching bookings:', error);
+        setError('Failed to load bookings. Please try again.');
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error fetching bookings:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load bookings. Please try again later.');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    fetchBookings();
+  }, [account, db]);
+
+  if (!account) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-[#0B1120] flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold mb-4">Connect Your Wallet</h1>
+            <p className="text-gray-400">Please connect your wallet to view your bookings.</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-[#0B1120] flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
-      <div className="min-h-screen bg-[#0B1120] text-white">
-        <div className="container mx-auto px-4 py-8">
+      <div className="min-h-screen bg-[#0B1120]">
+        <div className="container mx-auto px-6 py-8">
           <h1 className="text-3xl font-bold mb-8">My Bookings</h1>
 
-          {loading && (
-            <div className="flex justify-center items-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-            </div>
-          )}
-
           {error && (
-            <div className="bg-red-500 text-white p-4 rounded-lg mb-4">
+            <div className="bg-red-500 text-white p-4 rounded-lg mb-6">
               {error}
             </div>
           )}
 
-          {!loading && !error && bookings.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-gray-400">You don't have any bookings yet.</p>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {bookings.map((booking, index) => (
-              <div
-                key={`${booking.transactionHash}-${index}`}
-                className="bg-[#1A2332] rounded-lg overflow-hidden shadow-lg"
+          {bookings.length === 0 ? (
+            <div className="bg-[#1E293B] rounded-xl p-8 text-center">
+              <h2 className="text-xl font-semibold mb-2">No Bookings Found</h2>
+              <p className="text-gray-400 mb-6">You haven't made any bookings yet.</p>
+              <button
+                onClick={() => router.push('/hotels')}
+                className="px-6 py-3 bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors"
               >
-                {booking.hotel && (
-                  <div className="relative h-48">
-                    <img
-                      src={booking.hotel.image}
-                      alt={booking.hotel.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                )}
-                <div className="p-6">
-                  {booking.hotel ? (
-                    <>
-                      <h2 className="text-xl font-semibold mb-2">{booking.hotel.name}</h2>
-                      <p className="text-gray-400 mb-4">
-                        {booking.hotel.location.city}, {booking.hotel.location.country}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-gray-400 mb-4">Hotel details not available</p>
-                  )}
+                Browse Hotels
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {bookings.map((booking) => (
+                <div key={booking.id} className="bg-[#1E293B] rounded-xl overflow-hidden">
+                  <div className="flex flex-col md:flex-row">
+                    {/* Hotel Image */}
+                    <div className="relative w-full md:w-64 h-48">
+                      <Image
+                        src={booking.hotelDetails.image}
+                        alt={booking.hotelDetails.name}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
 
-                  <div className="space-y-2 text-sm text-gray-300">
-                    <p>
-                      <span className="font-medium">Check-in:</span>{' '}
-                      {format(booking.checkIn, 'PPP')}
-                    </p>
-                    <p>
-                      <span className="font-medium">Check-out:</span>{' '}
-                      {format(booking.checkOut, 'PPP')}
-                    </p>
-                    <p>
-                      <span className="font-medium">Total Price:</span>{' '}
-                      ${booking.totalPrice.toFixed(2)}
-                    </p>
-                    <p>
-                      <span className="font-medium">Status:</span>{' '}
-                      <span className={`capitalize ${
-                        booking.status === 'confirmed' ? 'text-green-500' :
-                        booking.status === 'cancelled' ? 'text-red-500' :
-                        'text-yellow-500'
-                      }`}>
-                        {booking.status}
-                      </span>
-                    </p>
-                  </div>
+                    {/* Booking Details */}
+                    <div className="flex-1 p-6">
+                      <div className="flex flex-col md:flex-row justify-between mb-4">
+                        <div>
+                          <h2 className="text-2xl font-semibold mb-2">{booking.hotelDetails.name}</h2>
+                          <p className="text-gray-400">
+                            {booking.hotelDetails.location.city}, {booking.hotelDetails.location.country}
+                          </p>
+                        </div>
+                        <div className="mt-4 md:mt-0">
+                          <span className={`px-3 py-1 rounded-full text-sm ${
+                            booking.status === 'confirmed' ? 'bg-green-500/20 text-green-500' : 'bg-yellow-500/20 text-yellow-500'
+                          }`}>
+                            {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                          </span>
+                        </div>
+                      </div>
 
-                  <div className="mt-4 pt-4 border-t border-gray-700">
-                    <a
-                      href={`${process.env.NEXT_PUBLIC_BLOCKCHAIN_EXPLORER}/tx/${booking.transactionHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-400 hover:text-blue-300 text-sm"
-                    >
-                      View on Explorer
-                    </a>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <p className="text-gray-400">Room Type</p>
+                          <p className="font-medium">{booking.roomDetails.type}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400">Guests</p>
+                          <p className="font-medium">{booking.guests} {booking.guests === 1 ? 'Guest' : 'Guests'}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400">Check-in</p>
+                          <p className="font-medium">{format(booking.checkIn.toDate(), 'PPP')}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400">Check-out</p>
+                          <p className="font-medium">{format(booking.checkOut.toDate(), 'PPP')}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center pt-4 border-t border-gray-700">
+                        <div className="mb-4 md:mb-0">
+                          <p className="text-gray-400">Total Price</p>
+                          <p className="text-xl font-semibold">${booking.totalPrice} USDT</p>
+                        </div>
+                        <div className="space-y-2">
+                          <a
+                            href={`https://sepolia.etherscan.io/tx/${booking.transactionHash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block text-sm text-blue-400 hover:text-blue-300"
+                          >
+                            View Transaction
+                          </a>
+                          <button
+                            onClick={() => router.push(`/hotels/${booking.hotelId}`)}
+                            className="block text-sm text-blue-400 hover:text-blue-300"
+                          >
+                            View Hotel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </Layout>

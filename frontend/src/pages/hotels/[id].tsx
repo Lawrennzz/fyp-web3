@@ -203,30 +203,31 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
       return;
     }
 
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hotels/${router.query.id}/book`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          roomId,
-          checkIn,
-          checkOut,
-          account
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Booking failed');
-      }
-
-      alert('Booking successful!');
-      router.push('/bookings');
-    } catch (error) {
-      console.error('Error booking room:', error);
-      alert('Error booking room. Please try again.');
+    // Calculate number of nights
+    const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Find the selected room
+    const selectedRoom = hotel?.rooms.find(room => room._id === roomId);
+    if (!selectedRoom) {
+      alert('Room not found');
+      return;
     }
+
+    // Calculate total price
+    const totalPrice = selectedRoom.pricePerNight * nights;
+
+    // Redirect to checkout page with booking details
+    router.push({
+      pathname: `/checkout/${roomId}`,
+      query: {
+        hotelId: hotel?._id,
+        checkIn: checkIn.toISOString(),
+        checkOut: checkOut.toISOString(),
+        guests: selectedGuests,
+        nights,
+        totalPrice,
+      }
+    });
   };
 
   // Show loading state

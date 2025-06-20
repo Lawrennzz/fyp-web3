@@ -3,10 +3,25 @@ import { MetaMask } from '@web3-react/metamask';
 import { Web3Provider } from '@ethersproject/providers';
 import { Contract } from '@ethersproject/contracts';
 
-// Initialize MetaMask connector
+// Initialize MetaMask connector with options to prevent automatic connection
 export const [metaMask, hooks] = initializeConnector<MetaMask>(
-  (actions) => new MetaMask({ actions })
+  (actions) => new MetaMask({ 
+    actions,
+    options: {
+      // Don't connect eagerly on page load
+      mustBeMetaMask: true,
+      // Don't show errors silently
+      silent: false,
+      // Timeout after 30 seconds
+      timeout: 30000
+    }
+  })
 );
+
+// Ensure MetaMask is deactivated on load
+if (typeof window !== 'undefined') {
+  metaMask.deactivate?.();
+}
 
 export const getContract = (
   address: string,

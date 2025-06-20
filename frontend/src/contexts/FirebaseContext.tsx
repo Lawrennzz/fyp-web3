@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { 
   User,
   signInWithEmailAndPassword,
@@ -8,9 +8,13 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   sendPasswordResetEmail,
-  browserPopupRedirectResolver
+  browserPopupRedirectResolver,
+  Auth
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
+import { initializeApp, getApps } from 'firebase/app';
+import { getFirestore, Firestore } from 'firebase/firestore';
+import { db } from '../config/firebase';
 
 interface AuthContextType {
   user: User | null;
@@ -133,4 +137,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       {!loading && children}
     </AuthContext.Provider>
   );
-}; 
+};
+
+interface FirebaseContextType {
+  db: Firestore;
+  auth: Auth;
+}
+
+const FirebaseContext = createContext<FirebaseContextType>({ db, auth });
+
+export function useFirebase() {
+  const context = useContext(FirebaseContext);
+  if (!context) {
+    throw new Error('useFirebase must be used within a FirebaseProvider');
+  }
+  return context;
+}
+
+interface FirebaseProviderProps {
+  children: ReactNode;
+}
+
+export function FirebaseProvider({ children }: FirebaseProviderProps) {
+  return (
+    <FirebaseContext.Provider value={{ db, auth }}>
+      {children}
+    </FirebaseContext.Provider>
+  );
+} 

@@ -35,7 +35,24 @@ export const useWalletConnect = (): UseWalletConnectReturn => {
   const [walletAddress, setWalletAddress] = useState<string | null>(() => {
     // Initialize from localStorage if available
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('walletAddress');
+      const storedAddress = localStorage.getItem('walletAddress');
+      const isGuest = localStorage.getItem('isGuest') === 'true';
+      const guestId = localStorage.getItem('guestId');
+      
+      // If it's a guest session, verify we have a valid guest ID
+      if (isGuest && guestId) {
+        return guestId;
+      }
+      // For non-guest sessions, return the stored address
+      else if (!isGuest && storedAddress) {
+        return storedAddress;
+      }
+      
+      // Clear invalid states
+      localStorage.removeItem('walletAddress');
+      localStorage.removeItem('isGuest');
+      localStorage.removeItem('guestId');
+      return null;
     }
     return null;
   });
@@ -73,6 +90,21 @@ export const useWalletConnect = (): UseWalletConnectReturn => {
   // Check for existing connection on mount
   useEffect(() => {
     const checkConnection = async () => {
+      // Check if we're in a disconnected state
+      const isDisconnected = localStorage.getItem('isDisconnected') === 'true';
+      if (isDisconnected) {
+        return;
+      }
+
+      // Check for guest session first
+      const isGuest = localStorage.getItem('isGuest') === 'true';
+      const guestId = localStorage.getItem('guestId');
+      if (isGuest && guestId) {
+        setWalletAddress(guestId);
+        return;
+      }
+
+      // Then check for MetaMask connection
       if (typeof window !== 'undefined' && window.ethereum && window.ethereum.isMetaMask) {
         try {
           const accounts = await window.ethereum.request({ method: 'eth_accounts' });
@@ -83,6 +115,7 @@ export const useWalletConnect = (): UseWalletConnectReturn => {
             if (network.chainId === config.NETWORK_ID) {
               setWalletAddress(accounts[0]);
               localStorage.setItem('walletAddress', accounts[0]);
+              localStorage.setItem('lastProvider', 'metamask');
             } else {
               setError('Please switch to the Ganache network in MetaMask.');
             }
@@ -116,6 +149,9 @@ export const useWalletConnect = (): UseWalletConnectReturn => {
     try {
       setIsConnecting(true);
       setError(null);
+      
+      // Clear disconnected state
+      localStorage.removeItem('isDisconnected');
 
       switch (provider) {
         case 'metamask': {
@@ -194,8 +230,12 @@ export const useWalletConnect = (): UseWalletConnectReturn => {
           throw new Error('Passkey login not implemented yet');
 
         case 'guest':
-          // Implement guest login
-          setWalletAddress('guest');
+          // Generate a temporary guest ID
+          const guestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          setWalletAddress(guestId);
+          localStorage.setItem('guestId', guestId);
+          localStorage.setItem('isGuest', 'true');
+          localStorage.setItem('lastProvider', 'guest');
           break;
 
         case 'google':
@@ -230,29 +270,37 @@ export const useWalletConnect = (): UseWalletConnectReturn => {
 
   const disconnectWallet = useCallback(async () => {
     try {
+      // Handle MetaMask disconnect
       const ethereum = window?.ethereum;
       if (ethereum) {
-        // Clear any cached permissions
-        await ethereum.request({
-          method: 'wallet_revokePermissions',
-          params: [{ eth_accounts: {} }]
-        }).catch(console.error); // Ignore if not supported
+        try {
+          // Clear any cached permissions
+          await ethereum.request({
+            method: 'wallet_revokePermissions',
+            params: [{ eth_accounts: {} }]
+          }).catch(() => {});
 
-        // Remove event listeners using the same handler functions
-        ethereum.removeListener('chainChanged', handleChainChanged);
-        ethereum.removeListener('accountsChanged', handleAccountsChanged);
+          // Remove event listeners
+          ethereum.removeListener('chainChanged', handleChainChanged);
+          ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        } catch (error) {
+          console.error('Error disconnecting MetaMask:', error);
+        }
       }
-      
-      // Clear local state
+
+      // Clear all states
       setWalletAddress(null);
-      localStorage.removeItem('walletAddress');
       setError(null);
+      setIsConnecting(false);
+
+      // Clear all local storage related to wallet connections
+      localStorage.clear();
       
-      // Force page reload to clear any cached provider state
-      window.location.reload();
+      // Set disconnected state
+      localStorage.setItem('isDisconnected', 'true');
     } catch (err) {
-      console.error('Error disconnecting wallet:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to disconnect wallet';
+      console.error('Error disconnecting:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to disconnect';
       setError(errorMessage);
       throw err;
     }

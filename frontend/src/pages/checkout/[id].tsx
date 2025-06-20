@@ -1,71 +1,75 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import Image from 'next/image';
+import Layout from '../../components/Layout';
 import { useWeb3React } from '@web3-react/core';
 import { Web3Provider } from '@ethersproject/providers';
 import { ethers } from 'ethers';
-import Layout from '../../components/Layout';
 import { getContract } from '../../utils/web3Config';
+import { format } from 'date-fns';
 import HotelBookingABI from '../../contracts/HotelBooking.json';
 import TestUSDTABI from '../../contracts/TestUSDT.json';
+import { useFirebase } from '../../contexts/FirebaseContext';
+import { addDoc, collection, Timestamp } from 'firebase/firestore';
 
-interface CheckoutFormData {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  promoCode?: string;
-}
+interface CheckoutProps {}
 
-interface BookingDetails {
-  hotelId: string;
-  roomId: string;
-  checkIn: Date;
-  checkOut: Date;
-  totalPrice: number;
-  hotel: {
-    name: string;
-    location: {
-      city: string;
-      country: string;
-    };
-    image: string;
-  };
-  room: {
-    type: string;
-    amenities: string[];
-  };
-}
-
-export default function Checkout() {
+export default function Checkout({}: CheckoutProps) {
   const router = useRouter();
   const { account, provider } = useWeb3React<Web3Provider>();
-  const [loading, setLoading] = useState(false);
+  const { db } = useFirebase();
+  const isConnected = !!account;
+
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [formData, setFormData] = useState<CheckoutFormData>({
+  const [hotel, setHotel] = useState<any>(null);
+  const [room, setRoom] = useState<any>(null);
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     email: '',
     phone: '',
     promoCode: ''
   });
-  const [bookingDetails, setBookingDetails] = useState<BookingDetails | null>(null);
-  const [discount, setDiscount] = useState(0);
+
+  const { id: roomId, hotelId, checkIn, checkOut, guests, nights, totalPrice } = router.query;
 
   useEffect(() => {
-    if (router.query.id) {
-      fetchBookingDetails();
+    if (!isConnected) {
+      alert('Please connect your wallet to proceed with the booking');
+      router.push('/');
+      return;
     }
-  }, [router.query.id]);
 
-  const fetchBookingDetails = async () => {
+    if (router.isReady && hotelId && roomId) {
+      fetchHotelAndRoomDetails();
+    }
+  }, [router.isReady, hotelId, roomId]);
+
+  const fetchHotelAndRoomDetails = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hotels/booking/${router.query.id}`);
-      if (!response.ok) throw new Error('Failed to fetch booking details');
-      const data = await response.json();
-      setBookingDetails(data);
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hotels/${hotelId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch hotel details');
+      }
+
+      const hotelData = await response.json();
+      setHotel(hotelData);
+
+      const roomData = hotelData.rooms.find((r: any) => r._id === roomId);
+      if (!roomData) {
+        throw new Error('Room not found');
+      }
+      setRoom(roomData);
     } catch (error) {
-      console.error('Error fetching booking details:', error);
-      setError('Failed to load booking details');
+      console.error('Error fetching details:', error);
+      setError('Failed to load booking details. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -74,114 +78,111 @@ export default function Checkout() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const validatePromoCode = async () => {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/promo/validate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: formData.promoCode })
-      });
-      if (!response.ok) throw new Error('Invalid promo code');
-      const data = await response.json();
-      setDiscount(data.discount);
-    } catch (error) {
-      console.error('Error validating promo code:', error);
-      setError('Invalid promotion code');
+  const handlePayment = async () => {
+    if (!isConnected || !provider || !hotel || !room || !db) return;
+
+    // Validate form data
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone) {
+      alert('Please fill in all required fields');
+      return;
     }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!account || !provider || !bookingDetails) return;
 
     try {
-      setLoading(true);
-      setError(null);
+      setProcessingPayment(true);
 
-      // Get contract instances
+      // Get contract addresses
       const hotelBookingAddress = process.env.NEXT_PUBLIC_HOTEL_BOOKING_ADDRESS;
-      const testUSDTAddress = process.env.NEXT_PUBLIC_TEST_USDT_ADDRESS;
-      
-      if (!hotelBookingAddress || !testUSDTAddress) {
+      const usdtAddress = process.env.NEXT_PUBLIC_TEST_USDT_ADDRESS;
+
+      if (!hotelBookingAddress || !usdtAddress) {
         throw new Error('Contract addresses not found');
       }
 
-      const hotelContract = await getContract(hotelBookingAddress, HotelBookingABI, provider);
-      const usdtContract = await getContract(testUSDTAddress, TestUSDTABI, provider);
+      // Get contract instances
+      const hotelContract = await getContract(hotelBookingAddress, HotelBookingABI.abi, provider);
+      const usdtContract = await getContract(usdtAddress, TestUSDTABI.abi, provider);
 
-      // Calculate final price with discount
-      const finalPrice = bookingDetails.totalPrice * (1 - discount);
-      const priceInWei = ethers.utils.parseEther(finalPrice.toString());
+      // Convert total price to wei (assuming price is in USDT with 6 decimals)
+      const totalPriceWei = ethers.utils.parseUnits(totalPrice as string, 6);
 
       // Approve USDT spending
-      const approveTx = await usdtContract.approve(hotelBookingAddress, priceInWei);
-      await approveTx.wait();
+      const approveTx = await usdtContract.approve(hotelBookingAddress, totalPriceWei);
+      const approveReceipt = await approveTx.wait();
 
-      // Create booking
-      const bookTx = await hotelContract.bookRoom(
-        bookingDetails.hotelId,
-        bookingDetails.roomId,
-        Math.floor(new Date(bookingDetails.checkIn).getTime() / 1000),
-        Math.floor(new Date(bookingDetails.checkOut).getTime() / 1000),
-        priceInWei,
-        {
-          from: account
-        }
+      // Call the smart contract to process the booking
+      const tx = await hotelContract.bookRoom(
+        hotelId as string,
+        roomId as string,
+        new Date(checkIn as string).getTime() / 1000,
+        new Date(checkOut as string).getTime() / 1000,
+        Number(guests),
+        totalPriceWei,
+        { gasLimit: 500000 }
       );
 
-      // Wait for transaction confirmation
-      const receipt = await bookTx.wait();
+      // Wait for transaction to be mined
+      const receipt = await tx.wait();
 
-      // Update backend
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hotels/${bookingDetails.hotelId}/book`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          roomId: bookingDetails.roomId,
-          checkIn: bookingDetails.checkIn,
-          checkOut: bookingDetails.checkOut,
-          account,
-          transactionHash: receipt.transactionHash,
-          guestInfo: {
-            firstName: formData.firstName,
-            lastName: formData.lastName,
-            email: formData.email,
-            phone: formData.phone
-          }
-        })
-      });
+      // Store booking information in Firebase
+      const bookingData = {
+        userId: account.toLowerCase(),
+        hotelId: hotelId as string,
+        roomId: roomId as string,
+        hotelName: hotel.name,
+        roomType: room.type,
+        checkIn: Timestamp.fromDate(new Date(checkIn as string)),
+        checkOut: Timestamp.fromDate(new Date(checkOut as string)),
+        guests: Number(guests),
+        totalPrice: Number(totalPrice),
+        transactionHash: receipt.transactionHash,
+        approvalHash: approveReceipt.transactionHash,
+        status: 'confirmed',
+        createdAt: Timestamp.now(),
+        guestInfo: {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phone: formData.phone
+        },
+        hotelDetails: {
+          name: hotel.name,
+          location: hotel.location,
+          image: typeof hotel.images[0] === 'string' ? hotel.images[0] : hotel.images[0]?.url
+        },
+        roomDetails: {
+          type: room.type,
+          pricePerNight: room.pricePerNight,
+          amenities: room.amenities
+        }
+      };
 
-      if (!response.ok) {
-        throw new Error('Failed to update booking on backend');
-      }
+      await addDoc(collection(db, 'bookings'), bookingData);
 
-      // Redirect to confirmation page
-      router.push(`/bookings`);
-    } catch (error) {
-      console.error('Error processing payment:', error);
-      setError('Failed to process payment. Please try again.');
+      // Redirect to bookings page
+      router.push('/bookings');
+    } catch (error: any) {
+      console.error('Payment error:', error);
+      alert(error.message || 'Failed to process payment. Please try again.');
     } finally {
-      setLoading(false);
+      setProcessingPayment(false);
     }
   };
 
-  if (!bookingDetails) {
+  if (loading) {
     return (
       <Layout>
-        <div className="min-h-screen bg-[#0B1120] text-white">
-          <div className="container mx-auto px-4 py-8">
-            <h1 className="text-3xl font-bold mb-8">Checkout</h1>
-            {error ? (
-              <div className="bg-red-500 text-white p-4 rounded-lg">
-                {error}
-              </div>
-            ) : (
-              <div className="animate-pulse">
-                <div className="h-8 bg-gray-700 rounded w-32 mb-4"></div>
-                <div className="h-[200px] bg-gray-700 rounded-lg mb-4"></div>
-              </div>
-            )}
-          </div>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error || !hotel || !room) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-[#0B1120] flex items-center justify-center">
+          <div className="text-red-500">{error || 'Booking details not found'}</div>
         </div>
       </Layout>
     );
@@ -189,166 +190,130 @@ export default function Checkout() {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-[#0B1120] text-white">
-        <div className="container mx-auto px-4 py-8">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center text-blue-400 hover:text-blue-300 mb-8"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Hotel
-          </button>
+      <div className="min-h-screen bg-[#0B1120]">
+        <div className="container mx-auto px-6 py-8">
+          <div className="flex flex-col lg:flex-row gap-8">
+            {/* Booking Details */}
+            <div className="lg:w-2/3">
+              <h1 className="text-3xl font-bold mb-8">Confirm Your Booking</h1>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Booking Summary */}
-            <div className="bg-[#1A2332] rounded-lg p-6">
-              <h2 className="text-2xl font-bold mb-6">Your Booking</h2>
-              
-              <div className="mb-6">
-                <img
-                  src={bookingDetails.hotel.image}
-                  alt={bookingDetails.hotel.name}
-                  className="w-full h-48 object-cover rounded-lg mb-4"
-                />
-                <h3 className="text-xl font-semibold">{bookingDetails.hotel.name}</h3>
-                <p className="text-gray-400">
-                  {bookingDetails.hotel.location.city}, {bookingDetails.hotel.location.country}
-                </p>
-              </div>
-
-              <div className="space-y-4 mb-6">
-                <div className="flex justify-between">
-                  <span>Check-in</span>
-                  <span>{new Date(bookingDetails.checkIn).toLocaleDateString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Check-out</span>
-                  <span>{new Date(bookingDetails.checkOut).toLocaleDateString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Room Type</span>
-                  <span>{bookingDetails.room.type}</span>
-                </div>
-              </div>
-
-              <div className="border-t border-gray-700 pt-4">
-                <div className="flex justify-between text-lg mb-2">
-                  <span>Subtotal</span>
-                  <span>${bookingDetails.totalPrice.toFixed(2)} USDT</span>
-                </div>
-                {discount > 0 && (
-                  <div className="flex justify-between text-green-500 mb-2">
-                    <span>Discount</span>
-                    <span>-${(bookingDetails.totalPrice * discount).toFixed(2)} USDT</span>
+              {/* Hotel Info */}
+              <div className="bg-[#1E293B] rounded-xl p-6 mb-6">
+                <div className="flex gap-6">
+                  <div className="relative w-32 h-32 rounded-lg overflow-hidden">
+                    <Image
+                      src={typeof hotel.images[0] === 'string' ? hotel.images[0] : hotel.images[0]?.url}
+                      alt={hotel.name}
+                      fill
+                      className="object-cover"
+                    />
                   </div>
-                )}
-                <div className="flex justify-between text-xl font-bold">
-                  <span>Total</span>
-                  <span>${(bookingDetails.totalPrice * (1 - discount)).toFixed(2)} USDT</span>
+                  <div>
+                    <h2 className="text-2xl font-semibold mb-2">{hotel.name}</h2>
+                    <p className="text-gray-400">{hotel.location.address}</p>
+                    <p className="text-gray-400">{hotel.location.city}, {hotel.location.country}</p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Contact Form */}
-            <div className="bg-[#1A2332] rounded-lg p-6">
-              <h2 className="text-2xl font-bold mb-6">Contact Information</h2>
-              
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
+              {/* Contact Information */}
+              <div className="bg-[#1E293B] rounded-xl p-6 mb-6">
+                <h3 className="text-xl font-semibold mb-4">Contact Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-2">First Name</label>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">First Name *</label>
                     <input
                       type="text"
                       name="firstName"
                       value={formData.firstName}
                       onChange={handleInputChange}
+                      className="w-full bg-[#0B1120] border border-gray-700 rounded-lg p-3 text-white"
                       required
-                      className="w-full bg-[#0B1120] rounded-lg p-3 text-white"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-2">Last Name</label>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Last Name *</label>
                     <input
                       type="text"
                       name="lastName"
                       value={formData.lastName}
                       onChange={handleInputChange}
+                      className="w-full bg-[#0B1120] border border-gray-700 rounded-lg p-3 text-white"
                       required
-                      className="w-full bg-[#0B1120] rounded-lg p-3 text-white"
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">Email</label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full bg-[#0B1120] rounded-lg p-3 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">Phone Number</label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full bg-[#0B1120] rounded-lg p-3 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">Promotion Code</label>
-                  <div className="flex gap-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Email *</label>
                     <input
-                      type="text"
-                      name="promoCode"
-                      value={formData.promoCode}
+                      type="email"
+                      name="email"
+                      value={formData.email}
                       onChange={handleInputChange}
-                      className="flex-1 bg-[#0B1120] rounded-lg p-3 text-white"
+                      className="w-full bg-[#0B1120] border border-gray-700 rounded-lg p-3 text-white"
+                      required
                     />
-                    <button
-                      type="button"
-                      onClick={validatePromoCode}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                    >
-                      Apply
-                    </button>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Phone *</label>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      className="w-full bg-[#0B1120] border border-gray-700 rounded-lg p-3 text-white"
+                      required
+                    />
                   </div>
                 </div>
+              </div>
 
-                {error && (
-                  <div className="bg-red-500 text-white p-4 rounded-lg">
-                    {error}
+              {/* Room Details */}
+              <div className="bg-[#1E293B] rounded-xl p-6 mb-6">
+                <h3 className="text-xl font-semibold mb-4">Room Details</h3>
+                <div className="space-y-2">
+                  <p><span className="text-gray-400">Room Type:</span> {room.type}</p>
+                  <p><span className="text-gray-400">Guests:</span> {guests}</p>
+                  <p><span className="text-gray-400">Check-in:</span> {format(new Date(checkIn as string), 'PPP')}</p>
+                  <p><span className="text-gray-400">Check-out:</span> {format(new Date(checkOut as string), 'PPP')}</p>
+                  <p><span className="text-gray-400">Number of nights:</span> {nights}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Summary */}
+            <div className="lg:w-1/3">
+              <div className="sticky top-8">
+                <div className="bg-[#1E293B] rounded-xl p-6">
+                  <h3 className="text-xl font-semibold mb-4">Payment Summary</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Room rate</span>
+                      <span>${room.pricePerNight} per night</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Number of nights</span>
+                      <span>{nights}</span>
+                    </div>
+                    <div className="border-t border-gray-700 my-4"></div>
+                    <div className="flex justify-between text-lg font-semibold">
+                      <span>Total</span>
+                      <span>${totalPrice} USDT</span>
+                    </div>
+                    <button
+                      onClick={handlePayment}
+                      disabled={processingPayment || !isConnected}
+                      className="w-full mt-6 px-6 py-3 bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {processingPayment ? 'Processing...' : 'Confirm and Pay'}
+                    </button>
+                    {!isConnected && (
+                      <p className="text-sm text-red-500 text-center mt-2">
+                        Please connect your wallet to proceed
+                      </p>
+                    )}
                   </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={loading || !account}
-                  className={`w-full py-4 rounded-lg font-semibold ${
-                    loading || !account
-                      ? 'bg-gray-600 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
-                >
-                  {loading ? 'Processing...' : 'Pay Now'}
-                </button>
-
-                {!account && (
-                  <p className="text-center text-red-500">
-                    Please connect your wallet to proceed with payment
-                  </p>
-                )}
-              </form>
+                </div>
+              </div>
             </div>
           </div>
         </div>

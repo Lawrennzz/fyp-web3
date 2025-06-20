@@ -1,50 +1,37 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAnalytics, isSupported } from 'firebase/analytics';
-import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyBJ9Rc0ePvUq4yUcZfcMXvp2LXrvUDzXho",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "travelgo-fyp.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "travelgo-fyp",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "travelgo-fyp.firebasestorage.app",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "111010047752",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:111010047752:web:586dc4fded4344cf03eebd",
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-YJJ8QK8RV1"
-};
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+} as const;
 
-// Initialize Firebase only if it hasn't been initialized already
+// Validate required config
+const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'appId'];
+const missingKeys = requiredKeys.filter(key => !firebaseConfig[key as keyof typeof firebaseConfig]);
+
+if (missingKeys.length > 0) {
+  throw new Error(`Missing required Firebase configuration keys: ${missingKeys.join(', ')}`);
+}
+
 let app: FirebaseApp;
+
 try {
+  // Initialize Firebase only if it hasn't been initialized
   app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
 } catch (error) {
-  console.error("Error initializing Firebase:", error);
+  console.error('Error initializing Firebase:', error);
   throw error;
 }
 
-// Initialize Firebase services
-const auth = getAuth(app);
+// Get Firestore instance
+export const db = getFirestore(app);
 
-// Set persistence and initialize auth settings
-if (typeof window !== 'undefined') {
-  auth.useDeviceLanguage(); // Use the device's language
-}
-
-// Initialize Firestore and Storage
-const db = getFirestore(app);
-const storage = getStorage(app);
-
-// Initialize Analytics only in browser environment and if supported
-let analytics = null;
-if (typeof window !== 'undefined') {
-  isSupported().then(supported => {
-    if (supported) {
-      analytics = getAnalytics(app);
-    }
-  }).catch(error => {
-    console.error("Error initializing analytics:", error);
-  });
-}
-
-export { app, auth, db, storage, analytics }; 
+// Get Auth instance
+export const auth = getAuth(app); 
