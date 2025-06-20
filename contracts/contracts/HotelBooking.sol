@@ -1,274 +1,201 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.9;
+pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 /**
  * @title HotelBooking
  * @dev Smart contract for a decentralized hotel booking platform
  */
-contract HotelBooking is ReentrancyGuard, Ownable {
-    // Counter for booking IDs
-    uint256 private bookingIdCounter;
+contract HotelBooking is Ownable, ReentrancyGuard {
+    IERC20 public paymentToken;
     
-    // Counter for hotel IDs
-    uint256 private hotelIdCounter;
-    
-    // Struct to store hotel details
-    struct Hotel {
-        uint256 id;
-        address hotelOwner;
-        string name;
-        string location;
-        string description;
-        string imageUrl;
-        bool isActive;
-    }
-    
-    // Struct to store room details
-    struct Room {
-        uint256 id;
-        uint256 hotelId;
-        string roomType;
-        uint256 price;
-        uint256 capacity;
-        bool isAvailable;
-    }
-    
-    // Struct to store booking details
     struct Booking {
-        uint256 id;
-        uint256 hotelId;
-        uint256 roomId;
         address guest;
-        uint256 checkInDate;
-        uint256 checkOutDate;
-        uint256 totalPrice;
-        bool isPaid;
-        bool isCancelled;
+        uint256 amount;
+        uint256 timestamp;
+        bool isRefunded;
+        string hotelId;
+        string roomId;
+        uint256 checkIn;
+        uint256 checkOut;
     }
     
-    // Mapping hotelId => Hotel
-    mapping(uint256 => Hotel) public hotels;
+    // Stats for admin dashboard
+    uint256 public totalTransactions;
+    uint256 public totalRevenue;
+    uint256 public pendingRefunds;
+    uint256 public failedTransactions;
     
-    // Mapping roomId => Room
-    mapping(uint256 => Room) public rooms;
+    mapping(string => Booking) public bookings;
+    mapping(address => string[]) public guestBookings;
+    mapping(string => mapping(uint256 => bool)) public roomAvailability;
     
-    // Mapping bookingId => Booking
-    mapping(uint256 => Booking) public bookings;
+    event BookingCreated(
+        string bookingId,
+        address guest,
+        uint256 amount,
+        uint256 timestamp,
+        string hotelId,
+        string roomId
+    );
     
-    // Mapping hotelId => roomIds
-    mapping(uint256 => uint256[]) public hotelRooms;
+    event RefundProcessed(
+        string bookingId,
+        address guest,
+        uint256 amount,
+        uint256 timestamp
+    );
     
-    // Mapping guest address => bookingIds
-    mapping(address => uint256[]) public guestBookings;
-    
-    // Events
-    event HotelAdded(uint256 hotelId, string name, address hotelOwner);
-    event RoomAdded(uint256 roomId, uint256 hotelId, string roomType, uint256 price);
-    event BookingCreated(uint256 bookingId, uint256 hotelId, uint256 roomId, address guest, uint256 checkInDate, uint256 checkOutDate);
-    event BookingPaid(uint256 bookingId, address guest, uint256 amount);
-    event BookingCancelled(uint256 bookingId);
-    
-    // Modifiers
-    modifier onlyHotelOwner(uint256 _hotelId) {
-        require(msg.sender == hotels[_hotelId].hotelOwner, "Only hotel owner can call this function");
-        _;
+    event TransactionFailed(
+        address guest,
+        uint256 amount,
+        uint256 timestamp,
+        string reason
+    );
+
+    constructor(address _paymentToken) {
+        paymentToken = IERC20(_paymentToken);
     }
     
-    modifier onlyGuest(uint256 _bookingId) {
-        require(msg.sender == bookings[_bookingId].guest, "Only booking guest can call this function");
-        _;
-    }
-    
-    // Constructor
-    constructor() {
-        bookingIdCounter = 1;
-        hotelIdCounter = 1;
-    }
-    
-    /**
-     * @dev Add a new hotel
-     * @param _name Hotel name
-     * @param _location Hotel location
-     * @param _description Hotel description
-     * @param _imageUrl Hotel image URL
-     * @return id of the new hotel
-     */
-    function addHotel(string memory _name, string memory _location, string memory _description, string memory _imageUrl) 
-        public 
-        returns (uint256) 
-    {
-        uint256 hotelId = hotelIdCounter++;
+    function book(
+        string memory bookingId,
+        string memory hotelId,
+        string memory roomId,
+        uint256 amount,
+        uint256 checkIn,
+        uint256 checkOut
+    ) external nonReentrant {
+        require(bytes(bookingId).length > 0, "Invalid booking ID");
+        require(amount > 0, "Invalid amount");
+        require(checkIn < checkOut, "Invalid dates");
+        require(bookings[bookingId].timestamp == 0, "Booking ID already exists");
         
-        hotels[hotelId] = Hotel({
-            id: hotelId,
-            hotelOwner: msg.sender,
-            name: _name,
-            location: _location,
-            description: _description,
-            imageUrl: _imageUrl,
-            isActive: true
-        });
+        // Check room availability
+        for (uint256 date = checkIn; date < checkOut; date += 1 days) {
+            require(!roomAvailability[roomId][date], "Room not available for selected dates");
+            roomAvailability[roomId][date] = true;
+        }
         
-        emit HotelAdded(hotelId, _name, msg.sender);
+        // Transfer payment
+        bool success = paymentToken.transferFrom(msg.sender, address(this), amount);
+        require(success, "Payment failed");
         
-        return hotelId;
-    }
-    
-    /**
-     * @dev Add a new room to a hotel
-     * @param _hotelId Hotel ID
-     * @param _roomType Type of room
-     * @param _price Price per night in wei
-     * @param _capacity Maximum number of guests
-     * @return id of the new room
-     */
-    function addRoom(uint256 _hotelId, string memory _roomType, uint256 _price, uint256 _capacity) 
-        public 
-        onlyHotelOwner(_hotelId)
-        returns (uint256) 
-    {
-        require(hotels[_hotelId].isActive, "Hotel is not active");
-        
-        uint256 roomId = uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, _hotelId, _roomType)));
-        
-        rooms[roomId] = Room({
-            id: roomId,
-            hotelId: _hotelId,
-            roomType: _roomType,
-            price: _price,
-            capacity: _capacity,
-            isAvailable: true
-        });
-        
-        hotelRooms[_hotelId].push(roomId);
-        
-        emit RoomAdded(roomId, _hotelId, _roomType, _price);
-        
-        return roomId;
-    }
-    
-    /**
-     * @dev Create a new booking
-     * @param _hotelId Hotel ID
-     * @param _roomId Room ID
-     * @param _checkInDate Check-in date (Unix timestamp)
-     * @param _checkOutDate Check-out date (Unix timestamp)
-     * @return id of the new booking
-     */
-    function createBooking(uint256 _hotelId, uint256 _roomId, uint256 _checkInDate, uint256 _checkOutDate) 
-        public 
-        returns (uint256) 
-    {
-        require(hotels[_hotelId].isActive, "Hotel is not active");
-        require(rooms[_roomId].isAvailable, "Room is not available");
-        require(_checkInDate < _checkOutDate, "Check-out date must be after check-in date");
-        require(_checkInDate > block.timestamp, "Check-in date must be in the future");
-        
-        // Calculate number of nights
-        uint256 numberOfNights = (_checkOutDate - _checkInDate) / 86400; // 86400 seconds = 1 day
-        require(numberOfNights > 0, "Booking must be for at least one night");
-        
-        // Calculate total price
-        uint256 totalPrice = rooms[_roomId].price * numberOfNights;
-        
-        uint256 bookingId = bookingIdCounter++;
-        
+        // Create booking
         bookings[bookingId] = Booking({
-            id: bookingId,
-            hotelId: _hotelId,
-            roomId: _roomId,
             guest: msg.sender,
-            checkInDate: _checkInDate,
-            checkOutDate: _checkOutDate,
-            totalPrice: totalPrice,
-            isPaid: false,
-            isCancelled: false
+            amount: amount,
+            timestamp: block.timestamp,
+            isRefunded: false,
+            hotelId: hotelId,
+            roomId: roomId,
+            checkIn: checkIn,
+            checkOut: checkOut
         });
         
-        // Add booking to guest's bookings
         guestBookings[msg.sender].push(bookingId);
         
-        // Mark room as unavailable
-        rooms[_roomId].isAvailable = false;
+        // Update stats
+        totalTransactions++;
+        totalRevenue += amount;
         
-        emit BookingCreated(bookingId, _hotelId, _roomId, msg.sender, _checkInDate, _checkOutDate);
-        
-        return bookingId;
+        emit BookingCreated(
+            bookingId,
+            msg.sender,
+            amount,
+            block.timestamp,
+            hotelId,
+            roomId
+        );
     }
     
-    /**
-     * @dev Pay for a booking
-     * @param _bookingId Booking ID
-     */
-    function payBooking(uint256 _bookingId) 
-        public 
-        payable 
-        onlyGuest(_bookingId)
-        nonReentrant 
-    {
-        Booking storage booking = bookings[_bookingId];
-        require(!booking.isPaid, "Booking is already paid");
-        require(!booking.isCancelled, "Booking is cancelled");
-        require(msg.value == booking.totalPrice, "Incorrect payment amount");
+    function processRefund(string memory bookingId) external onlyOwner nonReentrant {
+        Booking storage booking = bookings[bookingId];
+        require(booking.timestamp > 0, "Booking not found");
+        require(!booking.isRefunded, "Already refunded");
         
-        // Mark booking as paid
-        booking.isPaid = true;
+        // Process refund
+        bool success = paymentToken.transfer(booking.guest, booking.amount);
+        require(success, "Refund transfer failed");
         
-        // Transfer payment to hotel owner
-        Hotel storage hotel = hotels[booking.hotelId];
-        payable(hotel.hotelOwner).transfer(msg.value);
+        booking.isRefunded = true;
         
-        emit BookingPaid(_bookingId, msg.sender, msg.value);
+        // Free up room availability
+        for (uint256 date = booking.checkIn; date < booking.checkOut; date += 1 days) {
+            roomAvailability[booking.roomId][date] = false;
+        }
+        
+        // Update stats
+        totalRevenue -= booking.amount;
+        pendingRefunds--;
+        
+        emit RefundProcessed(
+            bookingId,
+            booking.guest,
+            booking.amount,
+            block.timestamp
+        );
     }
     
-    /**
-     * @dev Cancel a booking
-     * @param _bookingId Booking ID
-     */
-    function cancelBooking(uint256 _bookingId) 
-        public 
-        onlyGuest(_bookingId)
-    {
-        Booking storage booking = bookings[_bookingId];
-        require(!booking.isCancelled, "Booking is already cancelled");
-        require(!booking.isPaid, "Cannot cancel paid booking");
-        require(booking.checkInDate > block.timestamp, "Cannot cancel past bookings");
-        
-        // Mark booking as cancelled
-        booking.isCancelled = true;
-        
-        // Mark room as available again
-        rooms[booking.roomId].isAvailable = true;
-        
-        emit BookingCancelled(_bookingId);
+    // Admin dashboard functions
+    function getTotalTransactions() external view returns (uint256) {
+        return totalTransactions;
     }
     
-    /**
-     * @dev Get all rooms for a hotel
-     * @param _hotelId Hotel ID
-     * @return array of room IDs
-     */
-    function getHotelRooms(uint256 _hotelId) 
-        public 
-        view 
-        returns (uint256[] memory) 
-    {
-        return hotelRooms[_hotelId];
+    function getTotalRevenue() external view returns (uint256) {
+        return totalRevenue;
     }
     
-    /**
-     * @dev Get all bookings for a guest
-     * @param _guest Guest address
-     * @return array of booking IDs
-     */
-    function getGuestBookings(address _guest) 
-        public 
-        view 
-        returns (uint256[] memory) 
-    {
-        return guestBookings[_guest];
+    function getPendingRefunds() external view returns (uint256) {
+        return pendingRefunds;
+    }
+    
+    function getFailedTransactions() external view returns (uint256) {
+        return failedTransactions;
+    }
+    
+    function getBookingDetails(string memory bookingId) external view returns (
+        address guest,
+        uint256 amount,
+        uint256 timestamp,
+        bool isRefunded,
+        string memory hotelId,
+        string memory roomId,
+        uint256 checkIn,
+        uint256 checkOut
+    ) {
+        Booking memory booking = bookings[bookingId];
+        return (
+            booking.guest,
+            booking.amount,
+            booking.timestamp,
+            booking.isRefunded,
+            booking.hotelId,
+            booking.roomId,
+            booking.checkIn,
+            booking.checkOut
+        );
+    }
+    
+    function getGuestBookings(address guest) external view returns (string[] memory) {
+        return guestBookings[guest];
+    }
+    
+    // Function to handle failed transactions
+    function recordFailedTransaction(address guest, uint256 amount, string memory reason) external onlyOwner {
+        failedTransactions++;
+        emit TransactionFailed(guest, amount, block.timestamp, reason);
+    }
+    
+    // Emergency functions
+    function withdrawTokens(address token, uint256 amount) external onlyOwner {
+        require(IERC20(token).transfer(owner(), amount), "Transfer failed");
+    }
+    
+    function updatePaymentToken(address newToken) external onlyOwner {
+        require(newToken != address(0), "Invalid token address");
+        paymentToken = IERC20(newToken);
     }
 } 

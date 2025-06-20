@@ -18,6 +18,7 @@ import { db } from '../config/firebase';
 
 interface AuthContextType {
   user: User | null;
+  isAdmin: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
@@ -39,6 +40,7 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Function to update user's lastSignIn
   const updateUserLastSignIn = async (user: User) => {
@@ -59,6 +61,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (user) {
         // Update lastSignIn when user signs in
         await updateUserLastSignIn(user);
+        // Check if user is admin (you can implement your own admin check logic)
+        const token = await user.getIdTokenResult();
+        setIsAdmin(token.claims.admin === true);
+      } else {
+        setIsAdmin(false);
       }
       setUser(user);
       setLoading(false);
@@ -141,6 +148,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const value = {
     user,
+    isAdmin,
     loading,
     signIn,
     signUp,
