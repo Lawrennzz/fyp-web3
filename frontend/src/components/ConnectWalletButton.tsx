@@ -2,13 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import WalletConnect from './WalletConnect';
 import WalletDetails from './WalletDetails';
 import { IoPersonCircle, IoWallet, IoChevronDown, IoLogOut, IoLogoGoogle } from 'react-icons/io5';
-import { hooks } from '../utils/web3Config';
+import { hooks, metaMask } from '../utils/web3Config';
 import { formatAddress } from '../utils/web3';
 import { useWeb3React } from '@web3-react/core';
 import { Web3Provider } from '@ethersproject/providers';
 import { useAuth } from '../contexts/FirebaseContext';
 import Image from 'next/image';
-import { useWalletConnect } from '../hooks/useWalletConnect';
 
 export default function ConnectWalletButton() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -20,9 +19,7 @@ export default function ConnectWalletButton() {
   const { useAccount, useIsActive } = hooks;
   const account = useAccount();
   const isActive = useIsActive();
-  const { connector } = useWeb3React<Web3Provider>();
   const { user, logOut } = useAuth();
-  const { connectWallet } = useWalletConnect();
 
   // Close modal when wallet is connected or user is signed in
   useEffect(() => {
@@ -44,18 +41,69 @@ export default function ConnectWalletButton() {
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
+  // Clear error when dropdown closes
+  useEffect(() => {
+    if (!isDropdownOpen) {
+      setError(null);
+    }
+  }, [isDropdownOpen]);
+
+  const handleConnectMetaMask = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isConnectingMetaMask) return;
+
+    try {
+      setIsConnectingMetaMask(true);
+      setError(null);
+
+      // Check if MetaMask is installed
+      if (typeof window === 'undefined' || !window.ethereum || !window.ethereum.isMetaMask) {
+        window.open('https://metamask.io/download/', '_blank');
+        throw new Error('Please install MetaMask first. A new tab has been opened for you to download it.');
+      }
+
+      // Try to activate MetaMask
+      await metaMask.activate();
+      
+      // Wait for connection to be established
+      const connected = await new Promise((resolve) => {
+        const timeout = setTimeout(() => resolve(false), 10000); // 10 second timeout
+        
+        const checkConnection = setInterval(() => {
+          const provider = metaMask.provider as { selectedAddress?: string } | undefined;
+          if (provider?.selectedAddress) {
+            clearTimeout(timeout);
+            clearInterval(checkConnection);
+            resolve(true);
+          }
+        }, 100);
+      });
+
+      if (!connected) {
+        throw new Error('Connection timeout. Please try again.');
+      }
+
+      console.log('Successfully connected to MetaMask');
+    } catch (error: any) {
+      console.error('Failed to connect MetaMask:', error);
+      setError(error.message || 'Failed to connect MetaMask');
+    } finally {
+      setIsConnectingMetaMask(false);
+    }
+  };
+
   const handleDisconnect = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent event bubbling
-    if (isDisconnecting) return; // Prevent multiple clicks
+    e.stopPropagation();
+    if (isDisconnecting) return;
 
     try {
       setIsDisconnecting(true);
       
       // Handle Web3 wallet disconnect
-      if (connector?.deactivate) {
-        await connector.deactivate();
-      } else if (connector?.resetState) {
-        connector.resetState();
+      if (metaMask.deactivate) {
+        await metaMask.deactivate();
+      } else if (metaMask.resetState) {
+        metaMask.resetState();
       }
 
       // Handle Google sign out
@@ -81,30 +129,6 @@ export default function ConnectWalletButton() {
       setIsModalOpen(false);
     }
   }, [isActive, user]);
-
-  const handleConnectMetaMask = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isConnectingMetaMask) return;
-
-    try {
-      setIsConnectingMetaMask(true);
-
-      // Check if MetaMask is installed
-      if (typeof window === 'undefined' || !window.ethereum || !window.ethereum.isMetaMask) {
-        // Open MetaMask website in a new tab
-        window.open('https://metamask.io/download/', '_blank');
-        throw new Error('Please install MetaMask first. A new tab has been opened for you to download it.');
-      }
-
-      await connectWallet('metamask');
-    } catch (error: any) {
-      console.error('Failed to connect MetaMask:', error);
-      // Show error in the UI
-      setError(error.message || 'Failed to connect MetaMask');
-    } finally {
-      setIsConnectingMetaMask(false);
-    }
-  };
 
   // If user is signed in with Google or wallet is connected, show the user info
   if (user || (isActive && account)) {
@@ -147,6 +171,7 @@ export default function ConnectWalletButton() {
                   {error}
                 </div>
               )}
+              
               {isGoogleUser ? (
                 <>
                   <div className="flex items-center gap-3 mb-4">
