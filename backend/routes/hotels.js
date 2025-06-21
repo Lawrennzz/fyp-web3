@@ -188,11 +188,23 @@ router.get('/featured', async (req, res) => {
 // GET /api/hotels/:id - Get a specific hotel
 router.get('/:id', async (req, res) => {
   try {
+    console.log('Fetching hotel with ID:', req.params.id);
     const hotel = await Hotel.findById(req.params.id);
     if (!hotel) {
+      console.log('Hotel not found for ID:', req.params.id);
       return res.status(404).json({ message: 'Hotel not found' });
     }
-    res.json(hotel);
+    
+    console.log('Hotel found, transforming for frontend...');
+    const transformedHotel = transformHotelForFrontend(hotel);
+    
+    if (!transformedHotel) {
+      console.log('Failed to transform hotel data');
+      return res.status(500).json({ message: 'Error processing hotel data' });
+    }
+    
+    console.log('Successfully returning transformed hotel data');
+    res.json(transformedHotel);
   } catch (error) {
     console.error('Error fetching hotel:', error);
     res.status(500).json({ message: 'Error fetching hotel', error: error.message });

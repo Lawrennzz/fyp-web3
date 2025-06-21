@@ -263,10 +263,20 @@ export default function Bookings() {
                           >
                             View Transaction
                           </a>
-                          <button
-                            onClick={() => router.push(`/hotels/${booking.hotelId}`)}
+                                                    <button
+                            onClick={() => {
+                              // Map hotel names to correct database IDs
+                              const hotelIdMap: { [key: string]: string } = {
+                                "The Ritz-Carlton": "6856a0646aaf52ea0c8ebc83",
+                                "Mandarin Oriental": "6856a0646aaf52ea0c8ebc86",
+                                "Le Royal Monceau": "6856a0646aaf52ea0c8ebc89"
+                              };
+                              
+                              const correctHotelId = hotelIdMap[booking.hotelDetails.name] || booking.hotelId;
+                              router.push(`/hotels/${correctHotelId}`);
+                            }}
                             className="block text-sm text-blue-400 hover:text-blue-300"
-                    >
+                          >
                             View Hotel
                           </button>
                         </div>

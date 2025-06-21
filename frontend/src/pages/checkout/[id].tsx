@@ -115,9 +115,12 @@ export default function Checkout({}: CheckoutProps) {
 
       // Call the smart contract to process the booking
       console.log('Starting booking process with contract...');
-      const tx = await hotelContract.createBooking(
-        ethers.BigNumber.from(String(Date.now())),
-        ethers.BigNumber.from(String(Date.now() + 1)),
+      const bookingId = `TG-${Date.now()}`;
+      const tx = await hotelContract.book(
+        bookingId,
+        hotelId as string,
+        roomId as string,
+        totalPriceWei,
         Math.floor(new Date(checkIn as string).getTime() / 1000),
         Math.floor(new Date(checkOut as string).getTime() / 1000),
         { gasLimit: 500000 }

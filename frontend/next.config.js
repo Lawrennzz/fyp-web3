@@ -2,7 +2,8 @@
 const nextConfig = {
   reactStrictMode: true,
   env: {
-    NEXT_PUBLIC_API_URL: 'http://localhost:3001'
+    NEXT_PUBLIC_API_URL: 'http://localhost:3001',
+    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: 'AIzaSyB5iES0hDI9jsaWtVwaE7BON4WQq15LIXI'
   },
   images: {
     remotePatterns: [

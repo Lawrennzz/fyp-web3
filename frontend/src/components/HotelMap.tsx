@@ -134,10 +134,19 @@ export default function HotelMap({ hotels, onHotelClick }: HotelMapProps) {
   const [selectedHotel, setSelectedHotel] = useState<Hotel | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
+  // Debug logging
+  console.log('HotelMap: Received hotels:', hotels.length);
+  console.log('HotelMap: API Key exists:', !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
+
   // Filter hotels that have valid coordinates
   const hotelsWithCoordinates = hotels.filter(
     hotel => hotel.location?.coordinates?.lat && hotel.location?.coordinates?.lng
   );
+
+  console.log('HotelMap: Hotels with coordinates:', hotelsWithCoordinates.length);
+  hotelsWithCoordinates.forEach(hotel => {
+    console.log(`- ${hotel.name}: lat=${hotel.location.coordinates?.lat}, lng=${hotel.location.coordinates?.lng}`);
+  });
 
   const getMapCenter = useCallback(() => {
     if (hotelsWithCoordinates.length === 0) return defaultCenter;
