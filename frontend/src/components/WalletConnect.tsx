@@ -179,25 +179,17 @@ export default function WalletConnect({ isOpen, onClose }: WalletConnectProps) {
             }
             throw error;
           }
-        } catch (error: any) {
+                } catch (error: any) {
           console.error('MetaMask error:', error);
           throw error;
         }
       } else if (provider === 'guest') {
         try {
-          // Generate a random guest ID
-          const guestId = Math.random().toString(36).substring(2, 15);
-          
-          // Store guest info in localStorage
-          localStorage.setItem('isGuest', 'true');
-          localStorage.setItem('guestId', guestId);
-          localStorage.setItem('lastProvider', 'guest');
+          // Use the connectWallet function like other providers
+          await connectWallet('guest');
           
           // Close the modal
           onClose();
-          
-          // Force reload to update the UI
-          window.location.reload();
         } catch (error: any) {
           console.error('Guest mode error:', error);
           throw error;
@@ -305,6 +297,20 @@ export default function WalletConnect({ isOpen, onClose }: WalletConnectProps) {
               icon={
                 <div className="w-6 h-6 flex items-center justify-center">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                    <polyline points="22,6 12,13 2,6"></polyline>
+                  </svg>
+                </div>
+              }
+              label="Continue with Email"
+              onClick={() => handleConnect('email', { email: 'demo@example.com', password: 'demo123' })}
+              isLoading={isProcessing && activeProvider === 'email'}
+            />
+
+            <WalletOption
+              icon={
+                <div className="w-6 h-6 flex items-center justify-center">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                   </svg>
                 </div>
@@ -313,6 +319,8 @@ export default function WalletConnect({ isOpen, onClose }: WalletConnectProps) {
               onClick={() => handleConnect('guest')}
               isLoading={isProcessing && activeProvider === 'guest'}
             />
+
+
 
             <div className="mt-6 text-center">
               <p className="text-xs text-gray-500">

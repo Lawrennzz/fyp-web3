@@ -14,7 +14,7 @@ router.get('/', async (req, res) => {
   } catch (error) {
     console.error('Health check failed:', error);
     res.status(500).json({
-      status: 'unhealthy',
+      status: 'error',
       error: error.message
     });
   }

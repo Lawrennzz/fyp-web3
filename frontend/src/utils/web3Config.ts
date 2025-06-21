@@ -3,14 +3,14 @@ import { MetaMask } from '@web3-react/metamask';
 import { Web3Provider } from '@ethersproject/providers';
 import { Contract } from '@ethersproject/contracts';
 
-// Initialize MetaMask connector with options to prevent automatic connection
+// Initialize MetaMask connector with options
 export const [metaMask, hooks] = initializeConnector<MetaMask>(
   (actions) => new MetaMask({ 
     actions,
     options: {
-      // Don't connect eagerly on page load
+      // Allow eager connection if previously connected
       mustBeMetaMask: true,
-      // Don't show errors silently
+      // Show errors in console
       silent: false,
       // Timeout after 30 seconds
       timeout: 30000
@@ -18,9 +18,12 @@ export const [metaMask, hooks] = initializeConnector<MetaMask>(
   })
 );
 
-// Ensure MetaMask is deactivated on load
+// Only deactivate if explicitly disconnected
 if (typeof window !== 'undefined') {
-  metaMask.deactivate?.();
+  const isDisconnected = localStorage.getItem('isDisconnected') === 'true';
+  if (isDisconnected) {
+    metaMask.deactivate?.();
+  }
 }
 
 export const getContract = (

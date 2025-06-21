@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { 
-  User,
+  User as FirebaseUser,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
@@ -9,160 +9,182 @@ import {
   signInWithPopup,
   sendPasswordResetEmail,
   browserPopupRedirectResolver,
-  Auth
+  Auth,
+  getAuth
 } from 'firebase/auth';
-import { auth } from '../config/firebase';
+import { auth, app } from '../config/firebase';
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, Firestore, doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, Firestore, doc, setDoc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 interface AuthContextType {
-  user: User | null;
+  user: FirebaseUser | null;
   isAdmin: boolean;
-  loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  loading: boolean;
+  signInWithGoogle: () => Promise<FirebaseUser>;
   logOut: () => Promise<void>;
-  signInWithGoogle: () => Promise<User>;
-  resetPassword: (email: string) => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  isAdmin: false,
+  signIn: async () => {},
+  signUp: async () => {},
+  signOut: async () => {},
+  loading: true,
+  signInWithGoogle: async () => { throw new Error('Not implemented'); },
+  logOut: async () => {}
+});
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+export const useAuth = () => useContext(AuthContext);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-
-  // Function to update user's lastSignIn
-  const updateUserLastSignIn = async (user: User) => {
-    try {
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        lastSignIn: serverTimestamp(),
-        email: user.email,
-        provider: user.providerData[0]?.providerId || 'unknown'
-      });
-    } catch (error) {
-      console.error('Error updating lastSignIn:', error);
-    }
-  };
+  const [loading, setLoading] = useState(true);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setUser(user);
       if (user) {
-        // Update lastSignIn when user signs in
-        await updateUserLastSignIn(user);
-        // Check if user is admin (you can implement your own admin check logic)
-        const token = await user.getIdTokenResult();
-        setIsAdmin(token.claims.admin === true);
+        try {
+          // Check if user document exists
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDoc = await getDoc(userDocRef);
+
+          if (!userDoc.exists) {
+            // Create user document if it doesn't exist
+            await setDoc(userDocRef, {
+              email: user.email,
+              isAdmin: false,
+              createdAt: new Date(),
+              lastSignIn: new Date()
+            });
+            setIsAdmin(false);
+          } else {
+            // Update lastSignIn only if document exists
+            await updateDoc(userDocRef, {
+              lastSignIn: new Date()
+            });
+            setIsAdmin(userDoc.data()?.isAdmin ?? false);
+          }
+        } catch (error) {
+          console.error('Error handling user document:', error);
+          setIsAdmin(false);
+        }
       } else {
         setIsAdmin(false);
       }
-      setUser(user);
       setLoading(false);
     });
 
-    return unsubscribe;
-  }, []);
+    return () => unsubscribe();
+  }, [auth, db]);
 
-  const signIn = async (email: string, password: string) => {
+  const signInHandler = async (email: string, password: string) => {
     try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
-      await updateUserLastSignIn(result.user);
-    } catch (error: any) {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (error) {
       console.error('Error signing in:', error);
-      throw new Error(error.message || 'Failed to sign in');
+      throw error;
     }
   };
 
-  const signUp = async (email: string, password: string) => {
-    try {
-      await createUserWithEmailAndPassword(auth, email, password);
-    } catch (error: any) {
-      console.error('Error signing up:', error);
-      throw new Error(error.message || 'Failed to sign up');
-    }
-  };
-
-  const logOut = async () => {
+  const signOutHandler = async () => {
     try {
       await signOut(auth);
-    } catch (error: any) {
+      setUser(null);
+      setIsAdmin(false);
+    } catch (error) {
       console.error('Error signing out:', error);
-      throw new Error(error.message || 'Failed to sign out');
+      throw error;
     }
   };
 
-  const signInWithGoogle = async () => {
+  const signUpHandler = async (email: string, password: string) => {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userDocRef = doc(db, 'users', userCredential.user.uid);
+      await setDoc(userDocRef, {
+        email: email,
+        isAdmin: false,
+        createdAt: new Date(),
+        lastSignIn: new Date()
+      });
+    } catch (error) {
+      console.error('Error signing up:', error);
+      throw error;
+    }
+  };
+
+  const signInWithGoogleHandler = async (): Promise<FirebaseUser> => {
     try {
       const provider = new GoogleAuthProvider();
-      provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
-      provider.addScope('https://www.googleapis.com/auth/userinfo.email');
-      
-      provider.setCustomParameters({
-        prompt: 'select_account'
-      });
-
       const result = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
       
-      if (!result.user) {
-        throw new Error('No user data returned from Google sign in');
-      }
+      // Create or update user document
+      const userDocRef = doc(db, 'users', result.user.uid);
+      const userDoc = await getDoc(userDocRef);
 
-      // Update lastSignIn after successful Google sign in
-      await updateUserLastSignIn(result.user);
+      if (!userDoc.exists) {
+        await setDoc(userDocRef, {
+          email: result.user.email,
+          isAdmin: false,
+          createdAt: new Date(),
+          lastSignIn: new Date(),
+          displayName: result.user.displayName,
+          photoURL: result.user.photoURL
+        });
+      } else {
+        await updateDoc(userDocRef, {
+          lastSignIn: new Date(),
+          displayName: result.user.displayName,
+          photoURL: result.user.photoURL
+        });
+      }
 
       return result.user;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error signing in with Google:', error);
-      
-      if (error.code === 'auth/popup-blocked') {
-        throw new Error('Please enable popups for this website to sign in with Google');
-      } else if (error.code === 'auth/popup-closed-by-user') {
-        throw new Error('Google sign in was cancelled');
-      } else if (error.code === 'auth/unauthorized-domain') {
-        throw new Error('This domain is not authorized for Google sign in. Please contact support.');
-      }
-      
-      throw new Error(error.message || 'Failed to sign in with Google');
+      throw error;
     }
   };
 
-  const resetPassword = async (email: string) => {
+  const logOutHandler = async () => {
     try {
-      await sendPasswordResetEmail(auth, email);
-    } catch (error: any) {
-      console.error('Error resetting password:', error);
-      throw new Error(error.message || 'Failed to reset password');
+      await signOut(auth);
+      setUser(null);
+      setIsAdmin(false);
+      localStorage.removeItem('lastProvider');
+      localStorage.setItem('isDisconnected', 'true');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      throw error;
     }
-  };
-
-  const value = {
-    user,
-    isAdmin,
-    loading,
-    signIn,
-    signUp,
-    logOut,
-    signInWithGoogle,
-    resetPassword,
   };
 
   return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
+    <AuthContext.Provider
+      value={{
+        user,
+        isAdmin,
+        signIn: signInHandler,
+        signUp: signUpHandler,
+        signOut: signOutHandler,
+        loading,
+        signInWithGoogle: signInWithGoogleHandler,
+        logOut: logOutHandler
+      }}
+    >
+      {children}
     </AuthContext.Provider>
   );
-};
+}
 
 interface FirebaseContextType {
   db: Firestore;

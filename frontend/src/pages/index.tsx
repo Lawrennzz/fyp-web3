@@ -7,6 +7,7 @@ import { IoLocationOutline, IoPeopleOutline, IoCalendarOutline, IoStar, IoWallet
 import { BsCurrencyDollar } from 'react-icons/bs';
 import type { IconType } from 'react-icons';
 import Image from 'next/image';
+import { config } from '../config';
 
 interface Hotel {
   _id: string;
@@ -35,17 +36,16 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
   const popularDestinations: string[] = ['Dublin', 'Istanbul', 'Paris', 'London'];
 
   useEffect(() => {
     const checkBackendStatus = async () => {
       try {
-        const response = await fetch(`${BACKEND_URL}/api/health`);
+        const response = await fetch(`${config.API_URL}/api/health`);
         if (response.ok) {
           setBackendStatus('connected');
           // Fetch hotels separately
-          const hotelsResponse = await fetch(`${BACKEND_URL}/api/hotels`);
+          const hotelsResponse = await fetch(`${config.API_URL}/api/hotels`);
           if (hotelsResponse.ok) {
             const data = await hotelsResponse.json();
             setFeaturedHotels(data.slice(0, 6)); // Show first 6 hotels as featured
@@ -69,7 +69,7 @@ export default function Home() {
     // Check status every 30 seconds
     const interval = setInterval(checkBackendStatus, 30000);
     return () => clearInterval(interval);
-  }, [BACKEND_URL]);
+  }, []);
 
   const handleSearch = () => {
     if (!checkIn || !checkOut) {
@@ -164,10 +164,9 @@ export default function Home() {
               src="/images/hero-bg.jpg"
               alt="Hero background"
               fill
-              sizes="100vw"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 100vw, 100vw"
               quality={100}
               priority
-              fetchpriority="high"
               className="object-cover opacity-60"
               onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                 console.error('Error loading hero image');
@@ -181,104 +180,114 @@ export default function Home() {
           <div className="relative z-10 max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
             <div className="min-h-[700px] flex flex-col items-center justify-center py-20 lg:py-32">
               <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold text-center mb-6 text-white drop-shadow-lg max-w-[90%] mx-auto">
-                Your next hotel booking with Web3
+                Your next hotel booking with <span className="text-blue-500">Web3</span>
               </h1>
               <p className="text-lg sm:text-xl lg:text-2xl text-center text-white mb-12 lg:mb-16 max-w-3xl mx-auto font-medium drop-shadow-lg px-4">
                 The first native Web3 Hotel Booking Platform using Blockchain.
                 Experience secure and transparent bookings with cryptocurrency.
               </p>
+            </div>
+          </div>
+        </div>
 
-              {/* Search Bar */}
-              <div className="w-full max-w-6xl mx-auto px-4">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-[#0B1120]/30 backdrop-blur-[2px] rounded-2xl"></div>
-                  <div className="bg-[#0B1120]/70 backdrop-blur-xl rounded-2xl p-4 lg:p-3 border border-white/10 shadow-2xl relative">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-                      {/* Location Input */}
-                      <div className="flex items-center bg-[#0B1120]/50 hover:bg-[#0B1120]/60 rounded-xl h-14 px-4 lg:col-span-2 group transition-colors border border-white/10 focus-within:border-[#3898FF]/30">
-                        <LocationIcon className="text-white/90 group-hover:text-white w-5 h-5 transition-colors flex-shrink-0" />
-                        <input
-                          type="text"
-                          placeholder="Where are you traveling?"
-                          className="bg-transparent border-none focus:outline-none text-white w-full placeholder-white/70 text-base ml-3"
-                          value={location}
-                          onChange={handleLocationChange}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleSearch();
-                            }
-                          }}
-                        />
-                      </div>
-
-                      {/* Check-in Date */}
-                      <div className="flex items-center bg-[#0B1120]/50 hover:bg-[#0B1120]/60 rounded-xl h-14 px-4 group transition-colors border border-white/10 focus-within:border-[#3898FF]/30">
-                        <input
-                          type="date"
-                          value={checkIn ? checkIn.toISOString().split('T')[0] : ''}
-                          onChange={(e) => {
-                            const date = new Date(e.target.value);
-                            handleCheckInChange(date);
-                          }}
-                          min={new Date().toISOString().split('T')[0]}
-                          className="bg-transparent border-none focus:outline-none text-white w-full placeholder-white/70 text-base"
-                          placeholder="Check-in date"
-                        />
-                      </div>
-
-                      {/* Check-out Date */}
-                      <div className="flex items-center bg-[#0B1120]/50 hover:bg-[#0B1120]/60 rounded-xl h-14 px-4 group transition-colors border border-white/10 focus-within:border-[#3898FF]/30">
-                        <input
-                          type="date"
-                          value={checkOut ? checkOut.toISOString().split('T')[0] : ''}
-                          onChange={(e) => {
-                            const date = new Date(e.target.value);
-                            handleCheckOutChange(date);
-                          }}
-                          min={checkIn ? checkIn.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
-                          className="bg-transparent border-none focus:outline-none text-white w-full placeholder-white/70 text-base"
-                          placeholder="Check-out date"
-                        />
-                      </div>
-
-                      {/* Guests Input */}
-                      <div className="flex items-center bg-[#0B1120]/50 hover:bg-[#0B1120]/60 rounded-xl h-14 px-4 group transition-colors border border-white/10 focus-within:border-[#3898FF]/30">
-                        <PeopleIcon className="text-white/90 group-hover:text-white w-5 h-5 transition-colors flex-shrink-0" />
-                        <div className="flex items-center w-full ml-3">
-                          <button
-                            type="button"
-                            onClick={() => setGuests(prev => Math.max(1, prev - 1))}
-                            className="text-white/90 hover:text-white px-2 py-1"
-                          >
-                            -
-                          </button>
-                          <input
-                            type="number"
-                            min="1"
-                            max="10"
-                            value={guests}
-                            onChange={(e) => setGuests(Math.min(10, Math.max(1, parseInt(e.target.value) || 1)))}
-                            className="bg-transparent border-none focus:outline-none text-white w-16 text-center placeholder-white/70 text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            placeholder="Guests"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setGuests(prev => Math.min(10, prev + 1))}
-                            className="text-white/90 hover:text-white px-2 py-1"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Search Button */}
-                      <button
-                        onClick={handleSearch}
-                        className="bg-[#3898FF] hover:bg-[#3898FF]/90 text-white h-14 px-8 rounded-xl transition-colors font-semibold text-base shadow-[0_0_20px_rgba(56,152,255,0.15)] hover:shadow-[0_0_25px_rgba(56,152,255,0.25)] border border-[#3898FF]/30 w-full"
-                      >
-                        Search
-                      </button>
+        {/* Search Section */}
+        <div className="relative z-20 -mt-32 mb-16">
+          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-4">Find Your Perfect Stay</h2>
+              <p className="text-lg text-gray-300">Search from thousands of hotels worldwide</p>
+            </div>
+            
+            {/* Search Bar */}
+            <div className="w-full max-w-6xl mx-auto">
+              <div className="relative">
+                <div className="absolute inset-0 bg-[#0B1120]/30 backdrop-blur-[2px] rounded-2xl"></div>
+                <div className="bg-[#0B1120]/70 backdrop-blur-xl rounded-2xl p-6 border border-white/10 shadow-2xl relative">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                    {/* Location Input */}
+                    <div className="flex items-center bg-[#0B1120]/50 hover:bg-[#0B1120]/60 rounded-xl h-14 px-4 lg:col-span-2 group transition-colors border border-white/10 focus-within:border-[#3898FF]/30">
+                      <LocationIcon className="text-white/90 group-hover:text-white w-5 h-5 transition-colors flex-shrink-0" />
+                      <input
+                        type="text"
+                        placeholder="Where are you traveling?"
+                        className="bg-transparent border-none focus:outline-none text-white w-full placeholder-white/70 text-base ml-3"
+                        value={location}
+                        onChange={handleLocationChange}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleSearch();
+                          }
+                        }}
+                      />
                     </div>
+
+                    {/* Check-in Date */}
+                    <div className="flex items-center bg-[#0B1120]/50 hover:bg-[#0B1120]/60 rounded-xl h-14 px-4 group transition-colors border border-white/10 focus-within:border-[#3898FF]/30">
+                      <input
+                        type="date"
+                        value={checkIn ? checkIn.toISOString().split('T')[0] : ''}
+                        onChange={(e) => {
+                          const date = new Date(e.target.value);
+                          handleCheckInChange(date);
+                        }}
+                        min={new Date().toISOString().split('T')[0]}
+                        className="bg-transparent border-none focus:outline-none text-white w-full placeholder-white/70 text-base"
+                        placeholder="Check-in date"
+                      />
+                    </div>
+
+                    {/* Check-out Date */}
+                    <div className="flex items-center bg-[#0B1120]/50 hover:bg-[#0B1120]/60 rounded-xl h-14 px-4 group transition-colors border border-white/10 focus-within:border-[#3898FF]/30">
+                      <input
+                        type="date"
+                        value={checkOut ? checkOut.toISOString().split('T')[0] : ''}
+                        onChange={(e) => {
+                          const date = new Date(e.target.value);
+                          handleCheckOutChange(date);
+                        }}
+                        min={checkIn ? checkIn.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
+                        className="bg-transparent border-none focus:outline-none text-white w-full placeholder-white/70 text-base"
+                        placeholder="Check-out date"
+                      />
+                    </div>
+
+                    {/* Guests Input */}
+                    <div className="flex items-center bg-[#0B1120]/50 hover:bg-[#0B1120]/60 rounded-xl h-14 px-4 group transition-colors border border-white/10 focus-within:border-[#3898FF]/30">
+                      <PeopleIcon className="text-white/90 group-hover:text-white w-5 h-5 transition-colors flex-shrink-0" />
+                      <div className="flex items-center w-full ml-3">
+                        <button
+                          type="button"
+                          onClick={() => setGuests(prev => Math.max(1, prev - 1))}
+                          className="text-white/90 hover:text-white px-2 py-1"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          min="1"
+                          max="10"
+                          value={guests}
+                          onChange={(e) => setGuests(Math.min(10, Math.max(1, parseInt(e.target.value) || 1)))}
+                          className="bg-transparent border-none focus:outline-none text-white w-16 text-center placeholder-white/70 text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          placeholder="Guests"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setGuests(prev => Math.min(10, prev + 1))}
+                          className="text-white/90 hover:text-white px-2 py-1"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Search Button */}
+                    <button
+                      onClick={handleSearch}
+                      className="bg-[#3898FF] hover:bg-[#3898FF]/90 text-white h-14 px-8 rounded-xl transition-colors font-semibold text-base shadow-[0_0_20px_rgba(56,152,255,0.15)] hover:shadow-[0_0_25px_rgba(56,152,255,0.25)] border border-[#3898FF]/30 w-full"
+                    >
+                      Search
+                    </button>
                   </div>
                 </div>
               </div>

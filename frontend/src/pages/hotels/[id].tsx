@@ -278,7 +278,19 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-[#0B1120]">
+      <div className="min-h-screen bg-[#0B1120] text-white">
+        {/* Hero Section */}
+        <div className="relative h-[400px] md:h-[500px] lg:h-[600px]">
+          <Image
+            src={hotel?.image || '/images/default-hotel.jpg'}
+            alt={hotel?.name || 'Hotel'}
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 100vw, 100vw"
+            className="object-cover"
+            priority
+          />
+          <div className="absolute inset-0 bg-black/50" />
+        </div>
         <div className="container mx-auto px-6 py-8">
           {hotel && (
             <div className="flex flex-col lg:flex-row gap-8">

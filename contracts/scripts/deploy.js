@@ -1,14 +1,23 @@
 const { ethers, network } = require("hardhat");
+const fs = require("fs");
+const path = require("path");
 
 async function main() {
   console.log("Deploying HotelBooking contract...");
   console.log(`Network: ${network.name}`);
 
+  // Read USDT address from deployment file
+  const usdtDeploymentPath = path.join(__dirname, "..", "test-usdt-deployment.json");
+  const usdtDeployment = JSON.parse(fs.readFileSync(usdtDeploymentPath, "utf8"));
+  const usdtAddress = usdtDeployment.tokenAddress;
+
+  console.log(`Using USDT address: ${usdtAddress}`);
+
   // Get the contract factory
   const HotelBooking = await ethers.getContractFactory("HotelBooking");
   
-  // Deploy the contract
-  const hotelBooking = await HotelBooking.deploy();
+  // Deploy the contract with USDT address
+  const hotelBooking = await HotelBooking.deploy(usdtAddress);
   
   // Wait for the contract to be deployed
   await hotelBooking.waitForDeployment();
@@ -18,18 +27,29 @@ async function main() {
   
   console.log(`HotelBooking contract deployed to: ${hotelBookingAddress}`);
   
-  // Add verification command information
-  console.log("\nVerify with:");
-  console.log(`npx hardhat verify --network ${network.name} ${hotelBookingAddress}`);
+  // Save deployment info
+  const deploymentInfo = {
+    network: network.name,
+    hotelBookingAddress,
+    usdtAddress,
+    deploymentTime: new Date().toISOString()
+  };
+
+  fs.writeFileSync(
+    path.join(__dirname, "..", "deployment.json"),
+    JSON.stringify(deploymentInfo, null, 2)
+  );
+  
+  console.log("Deployment info saved to deployment.json");
   
   // For demo purposes, add a sample hotel and room
   if (network.name === "hardhat" || network.name === "localhost") {
     console.log("\nAdding a sample hotel...");
     
     const txHotel = await hotelBooking.addHotel(
-      "Blockchain Resort",
-      "Crypto City, Metaverse",
-      "A luxurious blockchain-themed resort with NFT artwork in every room",
+      "The Ritz-Carlton",
+      "150 Piccadilly, St. James's, London, United Kingdom",
+      "Experience luxury and elegance in the heart of London",
       "https://images.unsplash.com/photo-1566073771259-6a8506099945"
     );
     
@@ -38,11 +58,10 @@ async function main() {
     
     console.log("\nAdding a sample room...");
     
-    // Hotel ID is 1 (first hotel)
     const txRoom = await hotelBooking.addRoom(
-      1, // Hotel ID
-      "Deluxe King Room", 
-      ethers.parseEther("0.05"), // 0.05 ETH per night
+      "1", // Hotel ID
+      "Deluxe Room", 
+      ethers.parseUnits("500", 18), // 500 USDT per night
       2 // Max 2 guests
     );
     

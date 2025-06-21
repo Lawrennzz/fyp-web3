@@ -12,6 +12,7 @@ import { useAuth } from '../contexts/FirebaseContext';
 // Add MetaMask Ethereum provider type
 declare global {
   interface Window {
+    // @ts-ignore
     ethereum?: {
       isMetaMask?: boolean;
       request: (args: { method: string; params?: any[] }) => Promise<any>;
@@ -23,7 +24,7 @@ declare global {
   }
 }
 
-export type WalletProvider = 'metamask' | 'coinbase' | 'social' | 'email' | 'phone' | 'passkey' | 'guest' | 'google';
+export type WalletProvider = 'metamask' | 'coinbase' | 'social' | 'email' | 'phone' | 'passkey' | 'google' | 'guest';
 
 interface UseWalletConnectReturn {
   isConnecting: boolean;
@@ -46,22 +47,36 @@ export function useWalletConnect(): UseWalletConnectReturn {
     // Initialize from localStorage if available
     if (typeof window !== 'undefined') {
       const storedAddress = localStorage.getItem('walletAddress');
+      const lastProvider = localStorage.getItem('lastProvider');
+      const isDisconnected = localStorage.getItem('isDisconnected') === 'true';
       const isGuest = localStorage.getItem('isGuest') === 'true';
       const guestId = localStorage.getItem('guestId');
       
-      // If it's a guest session, verify we have a valid guest ID
+      // If user explicitly disconnected, clear everything
+      if (isDisconnected) {
+        localStorage.removeItem('walletAddress');
+        localStorage.removeItem('lastProvider');
+        localStorage.removeItem('isGuest');
+        localStorage.removeItem('guestId');
+        return null;
+      }
+      
+      // Check for guest session
       if (isGuest && guestId) {
         return guestId;
       }
-      // For non-guest sessions, return the stored address
-      else if (!isGuest && storedAddress) {
+      
+      // Only keep wallet address if it's from a valid provider
+      if (storedAddress && lastProvider && lastProvider !== 'guest') {
         return storedAddress;
       }
       
       // Clear invalid states
-      localStorage.removeItem('walletAddress');
-      localStorage.removeItem('isGuest');
-      localStorage.removeItem('guestId');
+      if (!isGuest) {
+        localStorage.removeItem('walletAddress');
+        localStorage.removeItem('isGuest');
+        localStorage.removeItem('guestId');
+      }
       return null;
     }
     return null;
@@ -91,9 +106,18 @@ export function useWalletConnect(): UseWalletConnectReturn {
   // Handle account changes
   const handleAccountsChanged = useCallback((accounts: string[]) => {
     if (accounts.length === 0) {
-      updateWalletState(null, 'Please unlock your MetaMask extension.');
+      // MetaMask disconnected - clear all session data
+      localStorage.removeItem('walletAddress');
+      localStorage.removeItem('lastProvider');
+      localStorage.removeItem('isGuest');
+      localStorage.removeItem('guestId');
+      localStorage.setItem('isDisconnected', 'true');
+      
+      updateWalletState(null, null);
+      setError(null);
     } else {
       updateWalletState(accounts[0], null);
+      localStorage.removeItem('isDisconnected');
     }
   }, [updateWalletState]);
 
@@ -103,20 +127,20 @@ export function useWalletConnect(): UseWalletConnectReturn {
       // Check if we're in a disconnected state
       const isDisconnected = localStorage.getItem('isDisconnected') === 'true';
       if (isDisconnected) {
+        // Don't auto-reconnect when user has explicitly disconnected
         return;
       }
 
-      // Check for guest session first
-      const isGuest = localStorage.getItem('isGuest') === 'true';
-      const guestId = localStorage.getItem('guestId');
-      if (isGuest && guestId) {
-        setWalletAddress(guestId);
-        return;
-      }
+      // Clean up any guest data
+      localStorage.removeItem('isGuest');
+      localStorage.removeItem('guestId');
 
-      // Then check for MetaMask connection
-      if (typeof window !== 'undefined' && window.ethereum && window.ethereum.isMetaMask) {
+      // Only auto-reconnect to MetaMask if user hasn't explicitly disconnected
+      // and we have a stored provider preference
+      const lastProvider = localStorage.getItem('lastProvider');
+      if (lastProvider === 'metamask' && typeof window !== 'undefined' && window.ethereum && window.ethereum.isMetaMask) {
         try {
+          // @ts-ignore
           const accounts = await window.ethereum.request({ method: 'eth_accounts' });
           if (accounts && accounts.length > 0) {
             const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -125,7 +149,6 @@ export function useWalletConnect(): UseWalletConnectReturn {
             if (network.chainId === config.NETWORK_ID) {
               setWalletAddress(accounts[0]);
               localStorage.setItem('walletAddress', accounts[0]);
-              localStorage.setItem('lastProvider', 'metamask');
               
               // Activate MetaMask connector
               await metaMask.connectEagerly();
@@ -137,6 +160,10 @@ export function useWalletConnect(): UseWalletConnectReturn {
           console.error('Error checking existing connection:', error);
         }
       }
+      // Clear guest provider preferences
+      else if (lastProvider === 'guest') {
+        localStorage.removeItem('lastProvider');
+      }
     };
 
     checkConnection();
@@ -146,11 +173,15 @@ export function useWalletConnect(): UseWalletConnectReturn {
   useEffect(() => {
     const ethereum = window?.ethereum;
     if (typeof window !== 'undefined' && ethereum) {
+      // @ts-ignore
       ethereum.on('chainChanged', handleChainChanged);
+      // @ts-ignore
       ethereum.on('accountsChanged', handleAccountsChanged);
 
       return () => {
+        // @ts-ignore
         ethereum.removeListener('chainChanged', handleChainChanged);
+        // @ts-ignore
         ethereum.removeListener('accountsChanged', handleAccountsChanged);
       };
     }
@@ -179,26 +210,27 @@ export function useWalletConnect(): UseWalletConnectReturn {
             throw new Error('MetaMask is not installed. Please install the MetaMask Chrome extension to continue.');
           }
 
-          // Check if it's actually MetaMask
           if (!window.ethereum.isMetaMask) {
-            throw new Error('Please use the MetaMask Chrome extension as your wallet provider.');
+            throw new Error('Please install MetaMask extension');
           }
 
           console.log('Requesting account access...');
           try {
-            // Activate MetaMask connector
-            await metaMask.activate();
-
-            // Request account access
+            // Always request account access to ensure user sees MetaMask prompt
+            // This is important when MetaMask is connected but user disconnected from app
+            // @ts-ignore
             const accounts = await window.ethereum.request({ 
               method: 'eth_requestAccounts' 
             });
 
             if (!accounts || accounts.length === 0) {
-              throw new Error('No accounts found. Please make sure your MetaMask extension is unlocked.');
+              throw new Error('No accounts found. Please unlock MetaMask.');
             }
 
-            // Get the provider and check network in parallel
+            // Activate MetaMask connector
+            await metaMask.activate();
+
+            // Get the provider and check network
             const provider = new ethers.providers.Web3Provider(window.ethereum);
             const network = await provider.getNetwork();
 
@@ -225,6 +257,11 @@ export function useWalletConnect(): UseWalletConnectReturn {
           const result = await signInWithPopup(auth, provider);
           if (result.user) {
             localStorage.setItem('lastProvider', 'google');
+            // Trigger a storage event to update other components
+            window.dispatchEvent(new StorageEvent('storage', {
+              key: 'lastProvider',
+              newValue: 'google'
+            }));
           }
           break;
         }
@@ -239,6 +276,49 @@ export function useWalletConnect(): UseWalletConnectReturn {
           
           // Update state
           updateWalletState(guestId, null);
+          
+          // Trigger storage events to update other components
+          window.dispatchEvent(new StorageEvent('storage', {
+            key: 'lastProvider',
+            newValue: 'guest'
+          }));
+          window.dispatchEvent(new StorageEvent('storage', {
+            key: 'isGuest',
+            newValue: 'true'
+          }));
+          break;
+        }
+        case 'email': {
+          // Email authentication using Firebase
+          if (payload?.email && payload?.password) {
+            const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
+            
+            try {
+              // Try to sign in first
+              const result = await signInWithEmailAndPassword(auth, payload.email, payload.password);
+              localStorage.setItem('lastProvider', 'email');
+              // Trigger a storage event to update other components
+              window.dispatchEvent(new StorageEvent('storage', {
+                key: 'lastProvider',
+                newValue: 'email'
+              }));
+            } catch (error: any) {
+              // If sign in fails, try to create account
+              if (error.code === 'auth/user-not-found') {
+                const result = await createUserWithEmailAndPassword(auth, payload.email, payload.password);
+                localStorage.setItem('lastProvider', 'email');
+                // Trigger a storage event to update other components
+                window.dispatchEvent(new StorageEvent('storage', {
+                  key: 'lastProvider',
+                  newValue: 'email'
+                }));
+              } else {
+                throw error;
+              }
+            }
+          } else {
+            throw new Error('Email and password are required for email authentication');
+          }
           break;
         }
         default:
@@ -259,7 +339,7 @@ export function useWalletConnect(): UseWalletConnectReturn {
         await connector.deactivate();
       }
       
-      // Clear all connection states
+      // Clear all connection states including any guest data
       localStorage.removeItem('walletAddress');
       localStorage.removeItem('lastProvider');
       localStorage.removeItem('isGuest');
@@ -288,4 +368,4 @@ export function useWalletConnect(): UseWalletConnectReturn {
     walletAddress,
     connectAsGuest,
   };
-} 
+}

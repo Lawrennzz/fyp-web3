@@ -1,12 +1,12 @@
 export const config = {
-  // Contract addresses - using newly deployed Ganache addresses
-  HOTEL_BOOKING_CONTRACT: '0x497ad272F24bd12841d552A9369a5C1480B9A0D6',
-  USDT_CONTRACT: '0x30B5Ce3B7a755Fb1Bdcaf1074DA1646A23213f91',
+  // Contract addresses - using newly deployed Hardhat addresses
+  HOTEL_BOOKING_CONTRACT: '0xe5998cDD7dF5025eC86018bBEaF29Fc2Bc36A0e4',
+  USDT_CONTRACT: '0x718874d3349dd5ab7332364B182dcD8fA224683d',
   
   // Network configuration
-  NETWORK_ID: 1337, // Ganache Network
-  RPC_URL: 'http://127.0.0.1:7545', // Ganache default RPC URL
-  CHAIN_NAME: 'Ganache',
+  NETWORK_ID: 1337, // Local Network
+  RPC_URL: 'http://127.0.0.1:7545', // Local RPC URL
+  CHAIN_NAME: 'Local Network',
   CHAIN_SYMBOL: 'ETH',
   CHAIN_DECIMALS: 18,
   

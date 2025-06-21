@@ -19,16 +19,6 @@ app.use(cors(config.corsOptions));
 app.use('/api/hotels', hotelRoutes);
 app.use('/api/health', healthRouter);
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    message: 'Server is running',
-    port: config.port,
-    mongoConnection: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
-  });
-});
-
 // Connect to MongoDB with detailed error logging
 mongoose.connect(config.mongoURI, {
   useNewUrlParser: true,

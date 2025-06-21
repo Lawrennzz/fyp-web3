@@ -5,18 +5,22 @@ import { useWeb3React } from '@web3-react/core';
 import { getContract } from '../../utils/web3Config';
 import { useAuth } from '../../contexts/FirebaseContext';
 import { IoWallet, IoDocumentText, IoRefresh, IoWarning } from 'react-icons/io5';
-import { Contract, Event } from 'ethers';
+import { Contract, Event, BigNumber } from 'ethers';
 import HotelBookingABI from '../../contracts/HotelBooking.json';
 import { Web3Provider } from '@ethersproject/providers';
+import { config } from '../../config';
+import { ethers } from 'ethers';
 
 interface Transaction {
   id: string;
   guestAddress: string;
-  amount: number;
+  hotelId: number;
+  roomId: number;
+  checkInDate: Date;
+  checkOutDate: Date;
   status: 'pending' | 'completed' | 'failed';
-  timestamp: Date;
   type: 'payment' | 'refund';
-  bookingId: string;
+  bookingId: number;
 }
 
 interface DashboardStats {
@@ -27,19 +31,12 @@ interface DashboardStats {
 }
 
 interface BookingEventArgs {
-  bookingId: string;
+  bookingId: BigNumber;
+  hotelId: BigNumber;
+  roomId: BigNumber;
   guest: string;
-  amount: string;
-  timestamp: number;
-  hotelId: string;
-  roomId: string;
-}
-
-interface RefundEventArgs {
-  bookingId: string;
-  guest: string;
-  amount: string;
-  timestamp: number;
+  checkInDate: BigNumber;
+  checkOutDate: BigNumber;
 }
 
 export default function AdminDashboard() {
@@ -66,50 +63,71 @@ export default function AdminDashboard() {
     if (account && library) {
       fetchTransactions();
       fetchDashboardStats();
+
+      // Listen for new events
+      const contract = getContract(
+        config.HOTEL_BOOKING_CONTRACT,
+        HotelBookingABI.abi,
+        library as Web3Provider
+      );
+
+      const bookingFilter = contract.filters.BookingCreated();
+
+      contract.on(bookingFilter, (bookingId, hotelId, roomId, guest, checkInDate, checkOutDate) => {
+        const newTx: Transaction = {
+          id: bookingId.toString(),
+          guestAddress: guest,
+          hotelId: hotelId.toNumber(),
+          roomId: roomId.toNumber(),
+          checkInDate: new Date(checkInDate.toNumber() * 1000),
+          checkOutDate: new Date(checkOutDate.toNumber() * 1000),
+          status: 'completed',
+          type: 'payment',
+          bookingId: bookingId.toNumber()
+        };
+        setTransactions(prev => [...prev, newTx]);
+        fetchDashboardStats();
+      });
+
+      return () => {
+        contract.removeAllListeners();
+      };
     }
   }, [account, library]);
 
   const fetchTransactions = async () => {
     try {
-      if (!library || !process.env.NEXT_PUBLIC_HOTEL_BOOKING_ADDRESS) return;
+      if (!library) return;
       
       const contract = getContract(
-        process.env.NEXT_PUBLIC_HOTEL_BOOKING_ADDRESS,
+        config.HOTEL_BOOKING_CONTRACT,
         HotelBookingABI.abi,
         library as Web3Provider
       );
 
-      // Fetch transactions from smart contract
-      const events = await contract.queryFilter(contract.filters.BookingCreated());
-      const refundEvents = await contract.queryFilter(contract.filters.RefundProcessed());
+      // Fetch all past events
+      const filter = {
+        fromBlock: 0,
+        toBlock: 'latest'
+      };
+
+      const events = await contract.queryFilter(contract.filters.BookingCreated(), filter.fromBlock, filter.toBlock);
       
       // Transform blockchain events to transaction objects
-      const txs = [
-        ...events.map(event => {
-          const args = event.args as unknown as BookingEventArgs;
-          return {
-            id: event.transactionHash,
-            guestAddress: args.guest,
-            amount: parseFloat(args.amount),
-            status: 'completed' as const,
-            timestamp: new Date(args.timestamp * 1000),
-            type: 'payment' as const,
-            bookingId: args.bookingId
-          };
-        }),
-        ...refundEvents.map(event => {
-          const args = event.args as unknown as RefundEventArgs;
-          return {
-            id: event.transactionHash,
-            guestAddress: args.guest,
-            amount: parseFloat(args.amount),
-            status: 'completed' as const,
-            timestamp: new Date(args.timestamp * 1000),
-            type: 'refund' as const,
-            bookingId: args.bookingId
-          };
-        })
-      ];
+      const txs = events.map(event => {
+        const args = event.args as unknown as BookingEventArgs;
+        return {
+          id: args.bookingId.toString(),
+          guestAddress: args.guest,
+          hotelId: args.hotelId.toNumber(),
+          roomId: args.roomId.toNumber(),
+          checkInDate: new Date(args.checkInDate.toNumber() * 1000),
+          checkOutDate: new Date(args.checkOutDate.toNumber() * 1000),
+          status: 'completed' as const,
+          type: 'payment' as const,
+          bookingId: args.bookingId.toNumber()
+        };
+      });
 
       setTransactions(txs);
     } catch (error) {
@@ -119,10 +137,10 @@ export default function AdminDashboard() {
 
   const fetchDashboardStats = async () => {
     try {
-      if (!library || !process.env.NEXT_PUBLIC_HOTEL_BOOKING_ADDRESS) return;
+      if (!library) return;
       
       const contract = getContract(
-        process.env.NEXT_PUBLIC_HOTEL_BOOKING_ADDRESS,
+        config.HOTEL_BOOKING_CONTRACT,
         HotelBookingABI.abi,
         library as Web3Provider
       );
@@ -135,7 +153,7 @@ export default function AdminDashboard() {
 
       setStats({
         totalTransactions: totalTx.toNumber(),
-        totalRevenue: Number(revenue),
+        totalRevenue: parseFloat(ethers.utils.formatUnits(revenue, 18)),
         pendingRefunds: pendingRefunds.toNumber(),
         failedTransactions: failedTx.toNumber()
       });
@@ -225,16 +243,19 @@ export default function AdminDashboard() {
                     Guest Address
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Amount
+                    Hotel ID
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Type
+                    Room ID
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Check In
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Check Out
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Date
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Actions
@@ -251,14 +272,16 @@ export default function AdminDashboard() {
                       {tx.guestAddress.slice(0, 8)}...
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                      ${tx.amount}
+                      {tx.hotelId}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        tx.type === 'payment' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {tx.type}
-                      </span>
+                      {tx.roomId}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                      {tx.checkInDate.toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                      {tx.checkOutDate.toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                       <span className={`px-2 py-1 rounded-full text-xs ${
@@ -269,13 +292,10 @@ export default function AdminDashboard() {
                         {tx.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                      {tx.timestamp.toLocaleDateString()}
-                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       {tx.type === 'payment' && (
                         <button
-                          onClick={() => processRefund(tx.bookingId)}
+                          onClick={() => processRefund(tx.id)}
                           className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
                         >
                           Process Refund

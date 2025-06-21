@@ -24,12 +24,57 @@ export default function Layout({ children }: LayoutProps) {
   const isActive = useIsActive();
   const { user } = useAuth();
   const { walletAddress } = useWalletConnect();
-  const isGoogleUser = user && localStorage.getItem('lastProvider') === 'google';
-  const isGuest = localStorage.getItem('isGuest') === 'true';
-  const isMetaMaskConnected = isActive && account;
-  const isConnected = isMetaMaskConnected || !!walletAddress || isGoogleUser || isGuest;
+  const [isGoogleUser, setIsGoogleUser] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
   const [showWalletDetails, setShowWalletDetails] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Handle mounting state
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Handle client-side localStorage checks
+  useEffect(() => {
+    if (typeof window !== 'undefined' && isMounted) {
+      const isDisconnected = localStorage.getItem('isDisconnected') === 'true';
+      const lastProvider = localStorage.getItem('lastProvider');
+      
+      if (isDisconnected) {
+        // If explicitly disconnected, clear any lingering session data
+        setIsGoogleUser(false);
+        setIsGuest(false);
+      } else {
+        // Include email authentication as part of Google user flow
+        setIsGoogleUser(!!user && (lastProvider === 'google' || lastProvider === 'email'));
+        setIsGuest(localStorage.getItem('isGuest') === 'true' && lastProvider === 'guest');
+      }
+    }
+  }, [user, isMounted]);
+
+  // Listen for storage changes to update immediately when auth changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const handleStorageChange = (e: StorageEvent) => {
+        if (e.key === 'lastProvider' || e.key === 'isGuest') {
+          const isDisconnected = localStorage.getItem('isDisconnected') === 'true';
+          const lastProvider = localStorage.getItem('lastProvider');
+          
+          if (!isDisconnected) {
+            setIsGoogleUser(!!user && (lastProvider === 'google' || lastProvider === 'email'));
+            setIsGuest(localStorage.getItem('isGuest') === 'true' && lastProvider === 'guest');
+          }
+        }
+      };
+
+      window.addEventListener('storage', handleStorageChange);
+      return () => window.removeEventListener('storage', handleStorageChange);
+    }
+  }, [user]);
+
+  const isMetaMaskConnected = isActive && account;
+  const isConnected = isMetaMaskConnected || !!walletAddress || isGoogleUser || isGuest;
 
   // Create modal root on mount if it doesn't exist
   useEffect(() => {
@@ -92,6 +137,17 @@ export default function Layout({ children }: LayoutProps) {
       );
     }
     if (user) {
+      const lastProvider = localStorage.getItem('lastProvider');
+      if (lastProvider === 'email') {
+        return (
+          <div className="mr-2 w-6 h-6 flex items-center justify-center">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-400">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+              <polyline points="22,6 12,13 2,6"></polyline>
+            </svg>
+          </div>
+        );
+      }
       return (
         <Image
           src="/google-icon.svg"
@@ -150,7 +206,15 @@ export default function Layout({ children }: LayoutProps) {
               </div>
             </div>
             <div className="flex items-center relative">
-              {getDisplayAddress() ? (
+              {!isMounted ? (
+                // Show a consistent state during SSR/hydration
+                <button
+                  className="connect-button flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors"
+                  disabled
+                >
+                  Connect Wallet
+                </button>
+              ) : isConnected ? (
                 <button
                   onClick={() => setShowWalletDetails(!showWalletDetails)}
                   className="wallet-button flex items-center px-4 py-2 text-sm font-medium text-white bg-[#2a2b2f] hover:bg-[#2f3033] rounded-xl transition-colors relative"
@@ -166,12 +230,12 @@ export default function Layout({ children }: LayoutProps) {
                   Connect Wallet
                 </button>
               )}
-              {showWalletDetails && (
+              {showWalletDetails && isMounted && (
                 <div id="wallet-details" className="absolute top-12 right-0 mt-2 z-50 w-96 shadow-xl">
                   <WalletDetails onClose={() => setShowWalletDetails(false)} />
                 </div>
               )}
-              {showConnectModal && (
+              {showConnectModal && isMounted && (
                 <div id="connect-modal">
                   <ConnectWalletModal onClose={() => setShowConnectModal(false)} />
                 </div>

@@ -36,3 +36,6 @@
 
 # Vercel
 **/.vercel
+
+# Firebase Admin Key (sensitive)
+backend/firebase-admin-key.json
