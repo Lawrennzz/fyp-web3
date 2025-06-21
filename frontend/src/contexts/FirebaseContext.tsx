@@ -50,14 +50,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log('🔍 FirebaseContext Debug - Auth state changed:', user?.email);
       setUser(user);
       if (user) {
         try {
           // Check if user document exists
           const userDocRef = doc(db, 'users', user.uid);
+          console.log('📄 Fetching user document for UID:', user.uid);
           const userDoc = await getDoc(userDocRef);
 
           if (!userDoc.exists) {
+            console.log('❌ User document does not exist, creating new one');
             // Create user document if it doesn't exist
             await setDoc(userDocRef, {
               email: user.email,
@@ -67,17 +70,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             });
             setIsAdmin(false);
           } else {
+            console.log('✅ User document exists, data:', userDoc.data());
+            const userData = userDoc.data();
+            const adminStatus = userData?.isAdmin ?? false;
+            console.log('🔑 Admin status from Firestore:', adminStatus);
+            
             // Update lastSignIn only if document exists
             await updateDoc(userDocRef, {
               lastSignIn: new Date()
             });
-            setIsAdmin(userDoc.data()?.isAdmin ?? false);
+            setIsAdmin(adminStatus);
+            console.log('✅ Set isAdmin state to:', adminStatus);
           }
         } catch (error) {
-          console.error('Error handling user document:', error);
+          console.error('❌ Error handling user document:', error);
           setIsAdmin(false);
         }
       } else {
+        console.log('❌ No user, setting isAdmin to false');
         setIsAdmin(false);
       }
       setLoading(false);
