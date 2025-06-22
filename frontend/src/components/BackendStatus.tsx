@@ -16,6 +16,7 @@ interface StatusInfo {
 }
 
 export default function BackendStatus({ className }: BackendStatusProps) {
+  console.log('🔍 BackendStatus component mounted');
   const [isExpanded, setIsExpanded] = useState(false);
   const [status, setStatus] = useState<StatusInfo>({
     isConnected: false,
@@ -33,7 +34,7 @@ export default function BackendStatus({ className }: BackendStatusProps) {
       try {
         // Check API connection and latency
         const startTime = Date.now();
-        const apiResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/health`);
+        const apiResponse = await fetch('http://localhost:3001/api/health');
         const apiLatency = Date.now() - startTime;
         const isConnected = apiResponse.ok;
 
@@ -51,7 +52,7 @@ export default function BackendStatus({ className }: BackendStatusProps) {
             const network = await provider.getNetwork();
             const blockNumber = await provider.getBlockNumber();
             const gasPrice = ethers.utils.formatUnits(await provider.getGasPrice(), 'gwei');
-            
+
             networkInfo = {
               networkName: network.name,
               blockNumber,
@@ -66,7 +67,7 @@ export default function BackendStatus({ className }: BackendStatusProps) {
         setStatus({
           isConnected,
           apiLatency,
-          contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || null,
+          contractAddress: '0xe5998cDD7dF5025eC86018bBEaF29Fc2Bc36A0e4',
           ...networkInfo
         });
       } catch (error) {
@@ -95,13 +96,13 @@ export default function BackendStatus({ className }: BackendStatusProps) {
 
   if (isLoading) {
     return (
-      <div className={`fixed bottom-4 left-4 bg-[#1c1c1c] rounded-xl shadow-lg ${className}`}>
+      <div className={`fixed bottom-4 left-4 bg-gray-800 rounded-xl shadow-lg border border-gray-600 ${className}`} style={{ zIndex: 9999 }}>
         <div className="p-4 flex items-center space-x-3">
           <div className="animate-pulse flex items-center space-x-2">
-            <div className="h-2.5 w-2.5 bg-[#2d2d2d] rounded-full"></div>
+            <div className="h-3 w-3 bg-yellow-500 rounded-full"></div>
           </div>
           <div className="flex items-center space-x-2">
-            <div className="animate-pulse h-4 w-24 bg-[#2d2d2d] rounded"></div>
+            <span className="text-white text-sm">Loading Backend Status...</span>
           </div>
         </div>
       </div>
@@ -109,16 +110,17 @@ export default function BackendStatus({ className }: BackendStatusProps) {
   }
 
   return (
-    <div 
-      className={`fixed bottom-4 left-4 bg-[#1c1c1c] rounded-xl shadow-lg ${className} z-[100]`}
+    <div
+      className={`fixed bottom-4 left-4 bg-gray-800 rounded-xl shadow-lg border border-gray-600 ${className}`}
+      style={{ zIndex: 9999 }}
     >
-      <div 
+      <div
         className="p-4 cursor-pointer flex items-center space-x-3"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className={`h-2.5 w-2.5 rounded-full ${getStatusColor(status.isConnected)}`}></div>
         <span className="text-white font-medium text-sm">
-          Backend Status
+          Backend Status {status.isConnected ? '✅' : '❌'}
         </span>
         <button className="ml-2 text-gray-400 hover:text-white transition-colors">
           {isExpanded ? '▼' : '▶'}

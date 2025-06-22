@@ -5,7 +5,7 @@ import { metaMask } from '../utils/web3Config';
 import Link from 'next/link';
 import Image from 'next/image';
 import ConnectWalletButton from './ConnectWalletButton';
-import BackendStatus from './BackendStatus';
+import SimpleBackendStatus from './SimpleBackendStatus';
 import WalletDetails from './WalletDetails';
 import { useAuth } from '../contexts/FirebaseContext';
 import { useWalletConnect } from '../hooks/useWalletConnect';
@@ -40,7 +40,7 @@ export default function Layout({ children }: LayoutProps) {
     if (typeof window !== 'undefined' && isMounted) {
       const isDisconnected = localStorage.getItem('isDisconnected') === 'true';
       const lastProvider = localStorage.getItem('lastProvider');
-      
+
       if (isDisconnected) {
         // If explicitly disconnected, clear any lingering session data
         setIsGoogleUser(false);
@@ -60,7 +60,7 @@ export default function Layout({ children }: LayoutProps) {
         if (e.key === 'lastProvider' || e.key === 'isGuest') {
           const isDisconnected = localStorage.getItem('isDisconnected') === 'true';
           const lastProvider = localStorage.getItem('lastProvider');
-          
+
           if (!isDisconnected) {
             setIsGoogleUser(!!user && (lastProvider === 'google' || lastProvider === 'email'));
             setIsGuest(localStorage.getItem('isGuest') === 'true' && lastProvider === 'guest');
@@ -95,14 +95,14 @@ export default function Layout({ children }: LayoutProps) {
       const target = event.target as HTMLElement;
       const walletDetails = document.getElementById('wallet-details');
       const connectModal = document.getElementById('connect-modal');
-      
-      if (walletDetails && !walletDetails.contains(target) && 
-          !target.closest('.wallet-button')) {
+
+      if (walletDetails && !walletDetails.contains(target) &&
+        !target.closest('.wallet-button')) {
         setShowWalletDetails(false);
       }
-      
-      if (connectModal && !connectModal.contains(target) && 
-          !target.closest('.connect-button')) {
+
+      if (connectModal && !connectModal.contains(target) &&
+        !target.closest('.connect-button')) {
         setShowConnectModal(false);
       }
     };
@@ -174,31 +174,28 @@ export default function Layout({ children }: LayoutProps) {
                 <div className="flex items-center space-x-4">
                   <Link
                     href="/"
-                    className={`${
-                      router.pathname === '/'
-                        ? 'text-white'
-                        : 'text-gray-300 hover:text-white'
-                    } px-3 py-2 rounded-md text-sm font-medium transition-colors`}
+                    className={`${router.pathname === '/'
+                      ? 'text-white'
+                      : 'text-gray-300 hover:text-white'
+                      } px-3 py-2 rounded-md text-sm font-medium transition-colors`}
                   >
                     Home
                   </Link>
                   <Link
                     href="/hotels"
-                    className={`${
-                      router.pathname.startsWith('/hotels')
-                        ? 'text-white'
-                        : 'text-gray-300 hover:text-white'
-                    } px-3 py-2 rounded-md text-sm font-medium transition-colors`}
+                    className={`${router.pathname.startsWith('/hotels')
+                      ? 'text-white'
+                      : 'text-gray-300 hover:text-white'
+                      } px-3 py-2 rounded-md text-sm font-medium transition-colors`}
                   >
                     Hotels
                   </Link>
                   <Link
                     href="/bookings"
-                    className={`${
-                      router.pathname.startsWith('/bookings')
-                        ? 'text-white'
-                        : 'text-gray-300 hover:text-white'
-                    } px-3 py-2 rounded-md text-sm font-medium transition-colors`}
+                    className={`${router.pathname.startsWith('/bookings')
+                      ? 'text-white'
+                      : 'text-gray-300 hover:text-white'
+                      } px-3 py-2 rounded-md text-sm font-medium transition-colors`}
                   >
                     My Bookings
                   </Link>
@@ -245,7 +242,7 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       </nav>
       <main>{children}</main>
-      <BackendStatus />
+      <SimpleBackendStatus />
     </div>
   );
 } 
