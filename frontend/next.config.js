@@ -3,6 +3,8 @@ const nextConfig = {
   reactStrictMode: true,
   env: {
     NEXT_PUBLIC_API_URL: 'http://localhost:3001',
+    NEXT_PUBLIC_SITE_URL: 'http://localhost:3000',
+    NEXT_PUBLIC_SITE_URL: 'https://9edc-60-48-55-180.ngrok-free.app',
     NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: 'AIzaSyB5iES0hDI9jsaWtVwaE7BON4WQq15LIXI'
   },
   images: {
@@ -26,7 +28,7 @@ const nextConfig = {
         pathname: '/**',
       }
     ],
-    domains: ['firebasestorage.googleapis.com'],
+    domains: ['firebasestorage.googleapis.com', 'images.unsplash.com', 'localhost'],
   },
   // Add hostname configuration for development
   webpack: (config, { isServer }) => {
@@ -38,6 +40,19 @@ const nextConfig = {
       };
     }
     return config;
+  },
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*',
+          },
+        ],
+      },
+    ];
   },
 }
 

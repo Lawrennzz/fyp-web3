@@ -57,6 +57,8 @@ export default function Bookings() {
   const [selectedBooking, setSelectedBooking] = useState<string | null>(null);
   const [printView, setPrintView] = useState<Booking | null>(null);
 
+  const siteOrigin = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+
   useEffect(() => {
     if (!account || !db) return;
 
@@ -233,7 +235,7 @@ export default function Bookings() {
               <h2 className="text-xl font-semibold mb-4">Booking QR Code</h2>
               <div className="bg-white p-4 border border-gray-200 rounded-lg">
                 <QRCode
-                  value={`${window.location.origin}/bookings/confirmation/${printView.id}`}
+                  value={`${siteOrigin}/bookings/confirmation/${printView.id}`}
                   size={200}
                   style={{ height: "auto", maxWidth: "100%", width: "100%" }}
                   viewBox={`0 0 256 256`}
@@ -290,7 +292,7 @@ export default function Bookings() {
                   <h3 className="text-xl font-semibold mb-6">Scan QR Code</h3>
                   <div className="bg-white p-4 rounded-lg inline-block mb-6">
                     <QRCode
-                      value={`${window.location.origin}/bookings/confirmation/${selectedBooking}`}
+                      value={`${siteOrigin}/bookings/confirmation/${selectedBooking}`}
                       size={256}
                       style={{ height: "auto", maxWidth: "100%", width: "100%" }}
                       viewBox={`0 0 256 256`}

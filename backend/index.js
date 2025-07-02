@@ -25,22 +25,22 @@ mongoose.connect(config.mongoURI, {
   useUnifiedTopology: true,
   serverSelectionTimeoutMS: 5000 // 5 second timeout
 })
-.then(() => {
-  console.log('Connected to MongoDB successfully');
-  app.listen(config.port, () => {
-    console.log(`Server is running on port ${config.port}`);
+  .then(() => {
+    console.log('Connected to MongoDB successfully');
+    app.listen(config.port, () => {
+      console.log(`Server is running on port ${config.port}`);
+    });
+  })
+  .catch((error) => {
+    console.error('MongoDB connection error:', error);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+    process.exit(1);
   });
-})
-.catch((error) => {
-  console.error('MongoDB connection error:', error);
-  console.error('Error details:', {
-    name: error.name,
-    message: error.message,
-    code: error.code,
-    stack: error.stack
-  });
-  process.exit(1);
-});
 
 // Error handling middleware with detailed error information
 app.use((err, req, res, next) => {
@@ -54,7 +54,7 @@ app.use((err, req, res, next) => {
     query: req.query,
     body: req.body
   });
-  
+
   res.status(500).json({
     message: 'Something went wrong!',
     error: {
