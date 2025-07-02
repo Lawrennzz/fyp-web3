@@ -197,7 +197,7 @@ export default function Home() {
               <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-4">Find Your Perfect Stay</h2>
               <p className="text-lg text-gray-300">Search from thousands of hotels worldwide</p>
             </div>
-            
+
             {/* Search Bar */}
             <div className="w-full max-w-6xl mx-auto">
               <div className="relative">

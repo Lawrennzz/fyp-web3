@@ -26,6 +26,18 @@ const nextConfig = {
         pathname: '/**',
       }
     ],
+    domains: ['firebasestorage.googleapis.com'],
+  },
+  // Add hostname configuration for development
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        fs: false,
+        net: false,
+        tls: false,
+      };
+    }
+    return config;
   },
 }
 
