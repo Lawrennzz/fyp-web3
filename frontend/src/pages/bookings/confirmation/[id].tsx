@@ -152,17 +152,6 @@ export default function BookingConfirmation() {
                                 </div>
                             </div>
                         </div>
-
-                        <div className="mt-8 text-center">
-                            <a
-                                href={`${config.API_URL}/api/hotels/booking-confirmation/${booking.id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-block px-6 py-3 bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors"
-                            >
-                                Download PDF Confirmation
-                            </a>
-                        </div>
                     </div>
                 </div>
             </div>
