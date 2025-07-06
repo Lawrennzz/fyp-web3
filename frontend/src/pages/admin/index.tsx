@@ -4,7 +4,7 @@ import Layout from '../../components/Layout';
 import { useWeb3React } from '@web3-react/core';
 import { getContract } from '../../utils/web3Config';
 import { useAuth } from '../../contexts/FirebaseContext';
-import { IoWallet, IoDocumentText, IoRefresh, IoWarning } from 'react-icons/io5';
+import { IoWallet, IoDocumentText, IoRefresh, IoWarning, IoAdd } from 'react-icons/io5';
 import { Contract, Event, BigNumber } from 'ethers';
 import HotelBookingABI from '../../contracts/HotelBooking.json';
 import { Web3Provider } from '@ethersproject/providers';
@@ -80,7 +80,7 @@ export default function AdminDashboard() {
         isAdmin,
         authComplete: !authLoading
       });
-      
+
       // Only redirect if no user after auth is complete
       if (!user) {
         console.log('🔄 No user found, redirecting to home');
@@ -137,22 +137,22 @@ export default function AdminDashboard() {
       console.log('🔍 Fetching Firebase bookings...');
       const bookingsCollection = collection(db, 'bookings');
       const bookingsSnapshot = await getDocs(bookingsCollection);
-      
+
       const bookingsData = bookingsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as any[];
-      
+
       console.log('📄 Firebase bookings found:', bookingsData.length);
       console.log('📄 Looking for address: 0x197ed06Cb269f1725D456701C0a1A33FAaD124eD');
-      
+
       // Filter for the specific MetaMask address
-      const targetBookings = bookingsData.filter((booking: any) => 
+      const targetBookings = bookingsData.filter((booking: any) =>
         booking.userAddress?.toLowerCase() === '0x197ed06Cb269f1725D456701C0a1A33FAaD124eD'.toLowerCase()
       );
-      
+
       console.log('🎯 Bookings for target address:', targetBookings);
-      
+
       setFirebaseBookings(bookingsData);
     } catch (error) {
       console.error('❌ Error fetching Firebase bookings:', error);
@@ -162,7 +162,7 @@ export default function AdminDashboard() {
   const fetchTransactions = async () => {
     try {
       if (!library) return;
-      
+
       const contract = getContract(
         config.HOTEL_BOOKING_CONTRACT,
         HotelBookingABI.abi,
@@ -176,7 +176,7 @@ export default function AdminDashboard() {
       };
 
       const events = await contract.queryFilter(contract.filters.BookingCreated(), filter.fromBlock, filter.toBlock);
-      
+
       // Transform blockchain events to transaction objects
       const txs = events.map(event => {
         const args = event.args as unknown as BookingEventArgs;
@@ -203,7 +203,7 @@ export default function AdminDashboard() {
   const fetchDashboardStats = async () => {
     try {
       if (!library) return;
-      
+
       const contract = getContract(
         config.HOTEL_BOOKING_CONTRACT,
         HotelBookingABI.abi,
@@ -232,7 +232,7 @@ export default function AdminDashboard() {
   const processRefund = async (bookingId: string) => {
     try {
       if (!library || !process.env.NEXT_PUBLIC_HOTEL_BOOKING_ADDRESS) return;
-      
+
       const contract = getContract(
         process.env.NEXT_PUBLIC_HOTEL_BOOKING_ADDRESS,
         HotelBookingABI.abi,
@@ -292,194 +292,206 @@ export default function AdminDashboard() {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8">Admin Dashboard</h1>
-        
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-blue-500 text-white rounded-lg p-6">
-            <div className="flex items-center mb-2">
-              <IoWallet className="text-2xl mr-2" />
-              <h3 className="text-lg">Total Transactions</h3>
-            </div>
-            <p className="text-2xl font-bold">{stats.totalTransactions}</p>
-          </div>
-          
-          <div className="bg-green-500 text-white rounded-lg p-6">
-            <div className="flex items-center mb-2">
-              <IoDocumentText className="text-2xl mr-2" />
-              <h3 className="text-lg">Total Revenue</h3>
-            </div>
-            <p className="text-2xl font-bold">${stats.totalRevenue}</p>
-          </div>
-          
-          <div className="bg-yellow-500 text-white rounded-lg p-6">
-            <div className="flex items-center mb-2">
-              <IoRefresh className="text-2xl mr-2" />
-              <h3 className="text-lg">Pending Refunds</h3>
-            </div>
-            <p className="text-2xl font-bold">{stats.pendingRefunds}</p>
-          </div>
-          
-          <div className="bg-red-500 text-white rounded-lg p-6">
-            <div className="flex items-center mb-2">
-              <IoWarning className="text-2xl mr-2" />
-              <h3 className="text-lg">Failed Transactions</h3>
-            </div>
-            <p className="text-2xl font-bold">{stats.failedTransactions}</p>
-          </div>
-        </div>
+      <div className="min-h-screen bg-[#0B1120]">
+        <div className="container mx-auto px-6 py-8">
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold">Admin Dashboard</h1>
 
-        {/* Firebase Bookings Table */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mb-8">
-          <div className="px-4 py-5 sm:px-6">
-            <h2 className="text-xl font-semibold">Firebase Bookings ({firebaseBookings.length})</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">All bookings stored in Firebase database</p>
+            <div className="flex space-x-4">
+              <button
+                onClick={() => router.push('/admin/register-hotel')}
+                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                <IoAdd className="mr-2" />
+                Register New Hotel
+              </button>
+            </div>
           </div>
-          {firebaseBookings.length > 0 ? (
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="bg-blue-500 text-white rounded-lg p-6">
+              <div className="flex items-center mb-2">
+                <IoWallet className="text-2xl mr-2" />
+                <h3 className="text-lg">Total Transactions</h3>
+              </div>
+              <p className="text-2xl font-bold">{stats.totalTransactions}</p>
+            </div>
+
+            <div className="bg-green-500 text-white rounded-lg p-6">
+              <div className="flex items-center mb-2">
+                <IoDocumentText className="text-2xl mr-2" />
+                <h3 className="text-lg">Total Revenue</h3>
+              </div>
+              <p className="text-2xl font-bold">${stats.totalRevenue}</p>
+            </div>
+
+            <div className="bg-yellow-500 text-white rounded-lg p-6">
+              <div className="flex items-center mb-2">
+                <IoRefresh className="text-2xl mr-2" />
+                <h3 className="text-lg">Pending Refunds</h3>
+              </div>
+              <p className="text-2xl font-bold">{stats.pendingRefunds}</p>
+            </div>
+
+            <div className="bg-red-500 text-white rounded-lg p-6">
+              <div className="flex items-center mb-2">
+                <IoWarning className="text-2xl mr-2" />
+                <h3 className="text-lg">Failed Transactions</h3>
+              </div>
+              <p className="text-2xl font-bold">{stats.failedTransactions}</p>
+            </div>
+          </div>
+
+          {/* Firebase Bookings Table */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mb-8">
+            <div className="px-4 py-5 sm:px-6">
+              <h2 className="text-xl font-semibold">Firebase Bookings ({firebaseBookings.length})</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">All bookings stored in Firebase database</p>
+            </div>
+            {firebaseBookings.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Booking ID
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        User Address
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Hotel Name
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Total Price
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Created At
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {firebaseBookings.map((booking: any) => (
+                      <tr key={booking.id} className={booking.userAddress?.toLowerCase() === '0x197ed06Cb269f1725D456701C0a1A33FAaD124eD'.toLowerCase() ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {booking.id}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                          {booking.userAddress || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                          {booking.hotelName || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                          ${booking.totalPrice || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                          <span className={`px-2 py-1 rounded-full text-xs ${booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                              booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-gray-100 text-gray-800'
+                            }`}>
+                            {booking.status || 'unknown'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                          {booking.createdAt ? new Date(booking.createdAt.seconds * 1000).toLocaleDateString() : 'N/A'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                No Firebase bookings found
+              </div>
+            )}
+          </div>
+
+          {/* Blockchain Transactions Table */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+            <div className="px-4 py-5 sm:px-6">
+              <h2 className="text-xl font-semibold">Blockchain Transactions ({transactions.length})</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Transactions recorded on blockchain</p>
+            </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Booking ID
+                      Transaction ID
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      User Address
+                      Guest Address
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Hotel Name
+                      Hotel ID
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Total Price
+                      Room ID
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Check In
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Check Out
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Created At
+                      Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {firebaseBookings.map((booking: any) => (
-                    <tr key={booking.id} className={booking.userAddress?.toLowerCase() === '0x197ed06Cb269f1725D456701C0a1A33FAaD124eD'.toLowerCase() ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''}>
+                  {transactions.map((tx) => (
+                    <tr key={tx.id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                        {booking.id}
+                        {tx.id.slice(0, 8)}...
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                        {booking.userAddress || 'N/A'}
+                        {tx.guestAddress.slice(0, 8)}...
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                        {booking.hotelName || 'N/A'}
+                        {tx.hotelId}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                        ${booking.totalPrice || 'N/A'}
+                        {tx.roomId}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                          booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {booking.status || 'unknown'}
+                        {tx.checkInDate.toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                        {tx.checkOutDate.toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                        <span className={`px-2 py-1 rounded-full text-xs ${tx.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            tx.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                          }`}>
+                          {tx.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                        {booking.createdAt ? new Date(booking.createdAt.seconds * 1000).toLocaleDateString() : 'N/A'}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        {tx.type === 'payment' && (
+                          <button
+                            onClick={() => processRefund(tx.id)}
+                            className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
+                          >
+                            Process Refund
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          ) : (
-            <div className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
-              No Firebase bookings found
-            </div>
-          )}
-        </div>
-
-        {/* Blockchain Transactions Table */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-          <div className="px-4 py-5 sm:px-6">
-            <h2 className="text-xl font-semibold">Blockchain Transactions ({transactions.length})</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Transactions recorded on blockchain</p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Transaction ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Guest Address
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Hotel ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Room ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Check In
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Check Out
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {transactions.map((tx) => (
-                  <tr key={tx.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {tx.id.slice(0, 8)}...
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                      {tx.guestAddress.slice(0, 8)}...
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                      {tx.hotelId}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                      {tx.roomId}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                      {tx.checkInDate.toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                      {tx.checkOutDate.toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        tx.status === 'completed' ? 'bg-green-100 text-green-800' :
-                        tx.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {tx.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      {tx.type === 'payment' && (
-                        <button
-                          onClick={() => processRefund(tx.id)}
-                          className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
-                        >
-                          Process Refund
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </div>
       </div>
