@@ -1,5 +1,6 @@
 import '../styles/globals.css';
 import '../styles/datepicker.css';
+import '../styles/print.css';
 import type { AppProps } from 'next/app';
 import { Web3ReactProvider } from '@web3-react/core';
 import { MetaMask } from '@web3-react/metamask';
