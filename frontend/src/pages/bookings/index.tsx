@@ -1,14 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
-import Layout from '../../components/Layout';
+import Layout from '@/components/Layout';
 import { useWeb3React } from '@web3-react/core';
 import { Web3Provider } from '@ethersproject/providers';
-import { useFirebase } from '../../contexts/FirebaseContext';
+import { useFirebase } from '@/contexts/FirebaseContext';
 import { collection, query, where, orderBy, getDocs, onSnapshot, DocumentData, QuerySnapshot, DocumentSnapshot } from 'firebase/firestore';
 import { format } from 'date-fns';
 import QRCode from 'react-qr-code';
-import { config } from '../../config';
+import { config } from '@/config';
+import BookingPDFButton from '@/components/BookingPDFButton';
 
 interface Booking {
   id: string;
@@ -54,7 +55,6 @@ export default function Bookings() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedBooking, setSelectedBooking] = useState<string | null>(null);
   const [printView, setPrintView] = useState<Booking | null>(null);
 
   const siteOrigin = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
@@ -62,59 +62,11 @@ export default function Bookings() {
   useEffect(() => {
     if (!account || !db) return;
 
-    const fetchBookings = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+    setLoading(true);
+    setError(null);
 
-        console.log('Fetching bookings for account:', account.toLowerCase());
+    console.log('Fetching bookings for account:', account.toLowerCase());
 
-        const bookingsRef = collection(db, 'bookings');
-        const q = query(
-          bookingsRef,
-          where('userId', '==', account.toLowerCase()),
-          orderBy('createdAt', 'desc')
-        );
-
-        const querySnapshot = await getDocs(q);
-        console.log('Found bookings:', querySnapshot.size);
-
-        const bookingsData = querySnapshot.docs.map((doc: DocumentSnapshot<DocumentData>) => {
-          const data = doc.data();
-          console.log('Booking data:', data);
-          return {
-            id: doc.id,
-            userId: data?.userId,
-            hotelId: data?.hotelId,
-            roomId: data?.roomId,
-            hotelName: data?.hotelName,
-            roomType: data?.roomType,
-            checkIn: data?.checkIn,
-            checkOut: data?.checkOut,
-            guests: data?.guests,
-            totalPrice: data?.totalPrice,
-            status: data?.status,
-            transactionHash: data?.transactionHash,
-            approvalHash: data?.approvalHash,
-            createdAt: data?.createdAt,
-            hotelDetails: data?.hotelDetails,
-            roomDetails: data?.roomDetails,
-            guestInfo: data?.guestInfo
-          } as Booking;
-        });
-
-        setBookings(bookingsData);
-      } catch (error) {
-        console.error('Error fetching bookings:', error);
-        setError('Failed to load bookings. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchBookings();
-
-    // Set up real-time listener for new bookings
     const bookingsRef = collection(db, 'bookings');
     const q = query(
       bookingsRef,
@@ -122,38 +74,37 @@ export default function Bookings() {
       orderBy('createdAt', 'desc')
     );
 
-    const unsubscribe = onSnapshot(q, {
-      next: (snapshot: QuerySnapshot<DocumentData>) => {
-        const newBookings = snapshot.docs.map((doc: DocumentSnapshot<DocumentData>) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            userId: data?.userId,
-            hotelId: data?.hotelId,
-            roomId: data?.roomId,
-            hotelName: data?.hotelName,
-            roomType: data?.roomType,
-            checkIn: data?.checkIn,
-            checkOut: data?.checkOut,
-            guests: data?.guests,
-            totalPrice: data?.totalPrice,
-            status: data?.status,
-            transactionHash: data?.transactionHash,
-            approvalHash: data?.approvalHash,
-            createdAt: data?.createdAt,
-            hotelDetails: data?.hotelDetails,
-            roomDetails: data?.roomDetails,
-            guestInfo: data?.guestInfo
-          } as Booking;
-        });
-        setBookings(newBookings);
-      },
-      error: (error: Error) => {
-        console.error('Error in real-time bookings listener:', error);
-      }
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      {
+        next: (querySnapshot: QuerySnapshot<DocumentData>) => {
+          const bookingsData = querySnapshot.docs.map((doc: DocumentSnapshot<DocumentData>) => {
+            const data = doc.data() || {};
+            return {
+              id: doc.id,
+              ...data,
+              hotelDetails: data.hotelDetails || {},
+              roomDetails: data.roomDetails || {},
+              checkIn: data.checkIn,
+              checkOut: data.checkOut,
+              createdAt: data.createdAt,
+              guestInfo: data.guestInfo || {}
+            } as Booking;
+          });
 
-    // Cleanup subscription
+          console.log('Found bookings:', bookingsData.length);
+          setBookings(bookingsData);
+          setLoading(false);
+        },
+        error: (error: Error) => {
+          console.error('Error in real-time bookings listener:', error);
+          setError('Failed to load bookings. Please try again.');
+          setLoading(false);
+        }
+      }
+    );
+
+    // Cleanup subscription on unmount
     return () => unsubscribe();
   }, [account, db]);
 
@@ -239,6 +190,7 @@ export default function Bookings() {
                   size={200}
                   style={{ height: "auto", maxWidth: "100%", width: "100%" }}
                   viewBox={`0 0 256 256`}
+                  title="Booking QR Code"
                 />
               </div>
               <p className="text-sm text-gray-500 mt-2">Scan to view booking details</p>
@@ -262,10 +214,11 @@ export default function Bookings() {
             </button>
             <button
               onClick={() => window.print()}
-              className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+              className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 mr-4"
             >
               Print
             </button>
+            <BookingPDFButton booking={printView} className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600" />
           </div>
         </div>
       </div>
@@ -281,31 +234,6 @@ export default function Bookings() {
           {error && (
             <div className="bg-red-500 text-white p-4 rounded-lg mb-6">
               {error}
-            </div>
-          )}
-
-          {/* QR Code Dialog */}
-          {selectedBooking && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-[#1E293B] rounded-xl p-8">
-                <div className="text-center">
-                  <h3 className="text-xl font-semibold mb-6">Scan QR Code</h3>
-                  <div className="bg-white p-4 rounded-lg inline-block mb-6">
-                    <QRCode
-                      value={`${siteOrigin}/bookings/confirmation/${selectedBooking}`}
-                      size={256}
-                      style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-                      viewBox={`0 0 256 256`}
-                    />
-                  </div>
-                  <button
-                    onClick={() => setSelectedBooking(null)}
-                    className="px-6 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
             </div>
           )}
 
@@ -332,6 +260,7 @@ export default function Bookings() {
                         alt={booking.hotelDetails.name}
                         fill
                         className="object-cover"
+                        sizes="(max-width: 768px) 100vw, 33vw"
                       />
                     </div>
 
@@ -400,18 +329,21 @@ export default function Bookings() {
                           >
                             View Hotel
                           </button>
-                          <button
-                            onClick={() => setSelectedBooking(booking.id)}
+                          <a
+                            href={`/booking-confirmation/${booking.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="block text-sm text-blue-400 hover:text-blue-300"
                           >
-                            Generate QR Code
-                          </button>
+                            View Booking Details
+                          </a>
                           <button
                             onClick={() => handlePrint(booking)}
                             className="block text-sm text-blue-400 hover:text-blue-300"
                           >
                             Print Booking Details
                           </button>
+                          <BookingPDFButton booking={booking} />
                         </div>
                       </div>
                     </div>
@@ -424,4 +356,4 @@ export default function Bookings() {
       </div>
     </Layout>
   );
-} 
+}

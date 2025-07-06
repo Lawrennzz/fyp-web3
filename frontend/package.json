@@ -7,7 +7,9 @@
     "dev:network": "next dev -H 0.0.0.0",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "ngrok": "ngrok http 3000",
+    "mobile-connect": "start ngrok-mobile-connect.html"
   },
   "dependencies": {
     "@ethersproject/providers": "^5.7.2",
@@ -15,6 +17,7 @@
     "@metamask/providers": "^22.1.0",
     "@react-google-maps/api": "^2.20.7",
     "@types/react-datepicker": "^6.2.0",
+    "@types/web3": "^1.0.20",
     "@web3-react/core": "^8.2.3",
     "@web3-react/metamask": "^8.2.4",
     "@web3-react/walletconnect": "^8.2.3",
@@ -22,15 +25,19 @@
     "date-fns": "^4.1.0",
     "ethers": "^5.7.2",
     "firebase": "^11.9.1",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.1",
     "next": "^13.4.19",
     "qrcode": "^1.5.4",
     "react": "^18.2.0",
     "react-datepicker": "^8.4.0",
     "react-dom": "^18.2.0",
     "react-icons": "^5.0.1",
-    "react-qr-code": "^2.0.16",
+    "react-qr-code": "^2.0.17",
+    "react-to-pdf": "^2.0.1",
     "viem": "^1.21.4",
-    "wagmi": "^1.4.13"
+    "wagmi": "^1.4.13",
+    "web3": "^4.16.0"
   },
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.10",

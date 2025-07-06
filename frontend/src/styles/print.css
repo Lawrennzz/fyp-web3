@@ -1,0 +1,82 @@
+/* Print styles for booking confirmation */
+@media print {
+
+    /* Hide elements that shouldn't be in the PDF */
+    header,
+    footer,
+    nav,
+    button,
+    .print-hide {
+        display: none !important;
+    }
+
+    /* Set page margins and background */
+    body {
+        margin: 0;
+        padding: 0;
+        background: white !important;
+        color: black !important;
+    }
+
+    /* Ensure the content fits on the page */
+    .print-content {
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 15mm !important;
+        background: white !important;
+        color: black !important;
+        box-shadow: none !important;
+    }
+
+    /* Improve text readability */
+    p,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        color: black !important;
+        margin-bottom: 5mm !important;
+    }
+
+    /* Make images fit */
+    img {
+        max-width: 100% !important;
+        page-break-inside: avoid;
+    }
+
+    /* Avoid page breaks inside important elements */
+    .no-break {
+        page-break-inside: avoid;
+    }
+
+    /* Ensure page breaks after certain sections */
+    .page-break-after {
+        page-break-after: always;
+    }
+
+    /* Make links readable */
+    a {
+        color: blue !important;
+        text-decoration: underline !important;
+    }
+
+    /* Make tables readable */
+    table {
+        border-collapse: collapse !important;
+        width: 100% !important;
+    }
+
+    table,
+    th,
+    td {
+        border: 1px solid #ddd !important;
+    }
+
+    th,
+    td {
+        padding: 8px !important;
+        text-align: left !important;
+    }
+}

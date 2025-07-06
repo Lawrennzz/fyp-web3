@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { 
+import {
   User as FirebaseUser,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -31,12 +31,12 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isAdmin: false,
-  signIn: async () => {},
-  signUp: async () => {},
-  signOut: async () => {},
+  signIn: async () => { },
+  signUp: async () => { },
+  signOut: async () => { },
   loading: true,
   signInWithGoogle: async () => { throw new Error('Not implemented'); },
-  logOut: async () => {}
+  logOut: async () => { }
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -74,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const userData = userDoc.data();
             const adminStatus = userData?.isAdmin ?? false;
             console.log('🔑 Admin status from Firestore:', adminStatus);
-            
+
             // Update lastSignIn only if document exists
             await updateDoc(userDocRef, {
               lastSignIn: new Date()
@@ -136,7 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
-      
+
       // Create or update user document
       const userDocRef = doc(db, 'users', result.user.uid);
       const userDoc = await getDoc(userDocRef);

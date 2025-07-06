@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Travel.go QR Code Scanner</title>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #0B1120;
+            color: white;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .scanner-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto 30px;
+            overflow: hidden;
+            border-radius: 10px;
+        }
+
+        #reader {
+            width: 100%;
+            background: #1E293B;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        #result {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #1E293B;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .booking-details {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #1E293B;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .booking-details h2 {
+            margin-top: 0;
+            color: #3B82F6;
+        }
+
+        .detail-row {
+            display: flex;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #2D3748;
+            padding-bottom: 10px;
+        }
+
+        .detail-label {
+            width: 150px;
+            font-weight: bold;
+            color: #94A3B8;
+        }
+
+        .detail-value {
+            flex: 1;
+        }
+
+        .btn {
+            background-color: #3B82F6;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 15px;
+        }
+
+        .btn:hover {
+            background-color: #2563EB;
+        }
+
+        .error {
+            color: #EF4444;
+            margin-top: 10px;
+        }
+
+        .success {
+            color: #10B981;
+            margin-top: 10px;
+        }
+
+        .instructions {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #1E293B;
+            border-left: 4px solid #3B82F6;
+            border-radius: 8px;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #3B82F6;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 15px;
+            }
+
+            .detail-row {
+                flex-direction: column;
+            }
+
+            .detail-label {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+        }
+
+        @media print {
+            body {
+                background-color: white;
+                color: black;
+            }
+
+            .scanner-container,
+            #result,
+            .instructions,
+            .btn:not(#print-btn),
+            header h1 {
+                display: none;
+            }
+
+            .booking-details {
+                display: block;
+                background-color: white;
+                color: black;
+                border: 1px solid #ddd;
+            }
+
+            .detail-label {
+                color: #333;
+            }
+
+            .detail-value {
+                color: #000;
+            }
+
+            .booking-details h2 {
+                color: #000;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">Travel.go</div>
+            <h1>QR Code Scanner</h1>
+        </header>
+
+        <div class="instructions">
+            <p>Use this scanner to scan booking QR codes. Position the QR code within the camera view.</p>
+            <p>You can scan both URL-based QR codes and data-embedded QR codes.</p>
+        </div>
+
+        <div class="scanner-container">
+            <div id="reader"></div>
+        </div>
+
+        <div id="result">
+            <h2>Scan Result</h2>
+            <p id="result-text"></p>
+            <div id="url-result">
+                <p>Booking URL detected. Click the button below to open it:</p>
+                <button id="open-url-btn" class="btn">Open Booking</button>
+            </div>
+        </div>
+
+        <div class="booking-details" id="booking-details">
+            <h2>Booking Details</h2>
+            <div id="booking-content"></div>
+            <button id="print-btn" class="btn">Print Booking Details</button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script>
+        // Function to format date from ISO string
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+
+        // Function to display booking details
+        function displayBookingDetails(bookingData) {
+            const bookingDetails = document.getElementById('booking-details');
+            const bookingContent = document.getElementById('booking-content');
+
+            // Clear previous content
+            bookingContent.innerHTML = '';
+
+            // Create detail rows
+            const details = [
+                { label: 'Booking ID', value: bookingData.id || 'N/A' },
+                { label: 'Hotel', value: bookingData.hotelName || bookingData.hotelDetails?.name || 'N/A' },
+                { label: 'Room Type', value: bookingData.roomType || bookingData.roomDetails?.type || 'N/A' },
+                { label: 'Check-in', value: formatDate(bookingData.checkIn) },
+                { label: 'Check-out', value: formatDate(bookingData.checkOut) },
+                { label: 'Guests', value: bookingData.guests || 'N/A' },
+                { label: 'Total Price', value: bookingData.totalPrice ? `${bookingData.totalPrice} USDT` : 'N/A' },
+                { label: 'Status', value: bookingData.status ? bookingData.status.toUpperCase() : 'N/A' },
+                { label: 'Guest Name', value: bookingData.guestName || 'N/A' },
+                { label: 'Guest Email', value: bookingData.guestEmail || 'N/A' }
+            ];
+
+            // Add rows to the content
+            details.forEach(detail => {
+                const row = document.createElement('div');
+                row.className = 'detail-row';
+
+                const label = document.createElement('div');
+                label.className = 'detail-label';
+                label.textContent = detail.label + ':';
+
+                const value = document.createElement('div');
+                value.className = 'detail-value';
+                value.textContent = detail.value;
+
+                row.appendChild(label);
+                row.appendChild(value);
+                bookingContent.appendChild(row);
+            });
+
+            // Show the booking details
+            bookingDetails.style.display = 'block';
+
+            // Setup print button
+            document.getElementById('print-btn').onclick = function () {
+                window.print();
+            };
+        }
+
+        // Function to handle QR code scan result
+        function onScanSuccess(decodedText, decodedResult) {
+            // Stop the scanner
+            html5QrcodeScanner.clear();
+
+            const resultElement = document.getElementById('result');
+            const resultTextElement = document.getElementById('result-text');
+            const urlResultElement = document.getElementById('url-result');
+
+            resultTextElement.textContent = decodedText;
+            resultElement.style.display = 'block';
+
+            // Check if the decoded text is a URL or JSON data
+            if (decodedText.startsWith('http')) {
+                // It's a URL
+                urlResultElement.style.display = 'block';
+                document.getElementById('open-url-btn').onclick = function () {
+                    window.location.href = decodedText;
+                };
+            } else {
+                // Try to parse as JSON
+                try {
+                    const bookingData = JSON.parse(decodedText);
+                    urlResultElement.style.display = 'none';
+                    displayBookingDetails(bookingData);
+                } catch (error) {
+                    resultTextElement.innerHTML = `<p>Could not parse QR code data: ${error.message}</p><p class="error">The QR code does not contain valid booking data or URL.</p>`;
+                    urlResultElement.style.display = 'none';
+                }
+            }
+        }
+
+        // Function to handle QR code scan error
+        function onScanFailure(error) {
+            // console.warn(`QR code scan error: ${error}`);
+        }
+
+        // Initialize the QR code scanner
+        const html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader",
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+      /* verbose= */ false
+        );
+
+        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+    </script>
+</body>
+
+</html>

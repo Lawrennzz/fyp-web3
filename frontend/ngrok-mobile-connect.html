@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Travel.Go Mobile Connect</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0B1120;
+            color: white;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #1E293B;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h1,
+        h2 {
+            color: #60A5FA;
+        }
+
+        .card {
+            background-color: #2D3748;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #4B5563;
+            background-color: #374151;
+            color: white;
+            margin-bottom: 10px;
+        }
+
+        button {
+            background-color: #3B82F6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background-color: #2563EB;
+        }
+
+        .button-group {
+            display: flex;
+            margin-bottom: 15px;
+        }
+
+        .qr-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        #qrcode {
+            background-color: white;
+            padding: 15px;
+            border-radius: 4px;
+        }
+
+        .steps {
+            margin-top: 30px;
+        }
+
+        .step {
+            margin-bottom: 15px;
+        }
+
+        .step-number {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background-color: #3B82F6;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            margin-right: 10px;
+        }
+
+        .alert {
+            background-color: #374151;
+            border-left: 4px solid #3B82F6;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+
+        .alert.error {
+            border-left-color: #EF4444;
+        }
+
+        .alert.success {
+            border-left-color: #10B981;
+        }
+
+        #statusMessage {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Travel.Go Mobile Connect</h1>
+        <p>Connect to your local development server from mobile devices using ngrok.</p>
+
+        <div class="alert">
+            <strong>Note:</strong> Make sure your local development server is running with <code>npm run dev</code> and
+            ngrok is running with <code>npx ngrok http 3000</code>.
+        </div>
+
+        <div class="card">
+            <h2>Enter Ngrok URL</h2>
+            <p>Get or enter the URL from your ngrok tunnel:</p>
+
+            <div class="button-group">
+                <button onclick="fetchNgrokUrl()">Auto-Detect URL</button>
+                <button onclick="openNgrokDashboard()" style="background-color: #4B5563;">Open Ngrok Dashboard</button>
+            </div>
+
+            <div id="statusMessage"></div>
+
+            <input type="text" id="ngrokUrl" placeholder="https://your-endpoint.ngrok.io" oninput="autoGenerateQR()">
+
+            <div class="qr-container">
+                <div id="qrcode"></div>
+                <p id="urlDisplay"></p>
+            </div>
+        </div>
+
+        <div class="steps">
+            <h2>How to Use</h2>
+            <div class="step">
+                <span class="step-number">1</span>
+                <span>Start your Next.js server with <code>npm run dev</code></span>
+            </div>
+            <div class="step">
+                <span class="step-number">2</span>
+                <span>Start ngrok with <code>npx ngrok http 3000</code></span>
+            </div>
+            <div class="step">
+                <span class="step-number">3</span>
+                <span>The URL will be auto-detected or you can enter it manually</span>
+            </div>
+            <div class="step">
+                <span class="step-number">4</span>
+                <span>Scan the QR code with your mobile device</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <script>
+        function fetchNgrokUrl() {
+            const statusMessage = document.getElementById('statusMessage');
+            statusMessage.style.display = 'block';
+            statusMessage.className = '';
+            statusMessage.textContent = 'Fetching ngrok URL...';
+
+            fetch('http://localhost:4040/api/tunnels')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Could not connect to ngrok API');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const tunnels = data.tunnels;
+                    if (tunnels && tunnels.length > 0) {
+                        // Prefer HTTPS tunnel
+                        const httpsTunnel = tunnels.find(tunnel => tunnel.proto === 'https');
+                        const url = httpsTunnel ? httpsTunnel.public_url : tunnels[0].public_url;
+
+                        document.getElementById('ngrokUrl').value = url;
+                        statusMessage.className = 'alert success';
+                        statusMessage.textContent = 'URL detected successfully!';
+
+                        // Automatically generate QR code
+                        generateQR();
+                    } else {
+                        throw new Error('No active ngrok tunnels found');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching ngrok URL:', error);
+                    statusMessage.className = 'alert error';
+                    statusMessage.textContent = `Error: ${error.message}. Make sure ngrok is running with "npx ngrok http 3000"`;
+                });
+        }
+
+        function openNgrokDashboard() {
+            window.open('http://localhost:4040', '_blank');
+        }
+
+        function autoGenerateQR() {
+            // Add a small delay to avoid generating QR codes while typing
+            clearTimeout(window.qrTimeout);
+            window.qrTimeout = setTimeout(generateQR, 500);
+        }
+
+        function generateQR() {
+            const url = document.getElementById('ngrokUrl').value.trim();
+            if (!url) {
+                document.getElementById('qrcode').innerHTML = '';
+                document.getElementById('urlDisplay').textContent = '';
+                return;
+            }
+
+            // Clear previous QR code
+            document.getElementById('qrcode').innerHTML = '';
+
+            // Generate QR code
+            const typeNumber = 0;
+            const errorCorrectionLevel = 'L';
+            const qr = qrcode(typeNumber, errorCorrectionLevel);
+            qr.addData(url);
+            qr.make();
+            document.getElementById('qrcode').innerHTML = qr.createImgTag(5);
+
+            // Display URL
+            document.getElementById('urlDisplay').textContent = url;
+        }
+
+        // Try to auto-detect on page load
+        window.addEventListener('load', function () {
+            setTimeout(fetchNgrokUrl, 500);
+        });
+    </script>
+</body>
+
+</html>

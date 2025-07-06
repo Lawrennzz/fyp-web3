@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking QR Scanner</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1,
+        h2 {
+            color: #2563eb;
+        }
+
+        #reader {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        #result {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f8fafc;
+            border-radius: 8px;
+            border-left: 4px solid #2563eb;
+            display: none;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        th {
+            background-color: #f1f5f9;
+        }
+
+        .status-confirmed {
+            color: #16a34a;
+            font-weight: bold;
+        }
+
+        .status-pending {
+            color: #ca8a04;
+            font-weight: bold;
+        }
+
+        .status-cancelled {
+            color: #dc2626;
+            font-weight: bold;
+        }
+
+        .instructions {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f1f5f9;
+            border-radius: 8px;
+        }
+
+        .print-button {
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        @media print {
+            .no-print {
+                display: none;
+            }
+
+            body {
+                padding: 0;
+            }
+
+            #result {
+                border: none;
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Booking QR Scanner</h1>
+
+    <div class="instructions no-print">
+        <p>This page allows you to scan QR codes containing booking information.</p>
+        <p>Point your camera at a booking QR code to view the details.</p>
+    </div>
+
+    <div id="reader" class="no-print"></div>
+
+    <div id="result">
+        <h2>Booking Information</h2>
+        <div id="booking-details"></div>
+        <button class="print-button no-print" onclick="window.print()">Print Booking Details</button>
+    </div>
+
+    <script>
+        function onScanSuccess(decodedText, decodedResult) {
+            try {
+                // Parse the JSON data from the QR code
+                const bookingData = JSON.parse(decodedText);
+
+                // Display the booking data
+                displayBookingData(bookingData);
+
+                // Stop scanning
+                html5QrcodeScanner.clear();
+            } catch (error) {
+                console.error('Error parsing QR code data:', error);
+                alert('Invalid QR code format. Please scan a valid booking QR code.');
+            }
+        }
+
+        function displayBookingData(booking) {
+            const resultDiv = document.getElementById('result');
+            const bookingDetailsDiv = document.getElementById('booking-details');
+
+            // Format dates
+            const checkInDate = new Date(booking.checkIn);
+            const checkOutDate = new Date(booking.checkOut);
+            const formattedCheckIn = checkInDate.toLocaleDateString();
+            const formattedCheckOut = checkOutDate.toLocaleDateString();
+
+            // Calculate number of nights
+            const nights = Math.round((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
+
+            // Create HTML for booking details
+            let html = `
+                <table>
+                    <tr>
+                        <th colspan="2">${booking.hotelName}</th>
+                    </tr>
+                    <tr>
+                        <td>Booking ID:</td>
+                        <td>${booking.id}</td>
+                    </tr>
+                    <tr>
+                        <td>Status:</td>
+                        <td class="status-${booking.status}">${booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}</td>
+                    </tr>
+                    <tr>
+                        <td>Room Type:</td>
+                        <td>${booking.roomType}</td>
+                    </tr>
+                    <tr>
+                        <td>Check-in:</td>
+                        <td>${formattedCheckIn}</td>
+                    </tr>
+                    <tr>
+                        <td>Check-out:</td>
+                        <td>${formattedCheckOut}</td>
+                    </tr>
+                    <tr>
+                        <td>Nights:</td>
+                        <td>${nights}</td>
+                    </tr>
+                    <tr>
+                        <td>Guests:</td>
+                        <td>${booking.guests}</td>
+                    </tr>
+                    <tr>
+                        <td>Total Price:</td>
+                        <td>$${booking.totalPrice} USDT</td>
+                    </tr>
+                    <tr>
+                        <td>Guest Name:</td>
+                        <td>${booking.guestName}</td>
+                    </tr>
+                    <tr>
+                        <td>Guest Email:</td>
+                        <td>${booking.guestEmail}</td>
+                    </tr>
+                </table>
+            `;
+
+            bookingDetailsDiv.innerHTML = html;
+            resultDiv.style.display = 'block';
+        }
+
+        // Initialize QR code scanner
+        const html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader",
+            { fps: 10, qrbox: 250 }
+        );
+        html5QrcodeScanner.render(onScanSuccess);
+    </script>
+</body>
+
+</html>

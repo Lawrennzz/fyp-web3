@@ -10,9 +10,9 @@ import { ethers } from 'ethers';
 import DatePicker from 'react-datepicker';
 import { GetStaticProps, GetStaticPaths } from 'next';
 import { format } from 'date-fns';
-import { 
-  IoWifiOutline, 
-  IoRestaurantOutline, 
+import {
+  IoWifiOutline,
+  IoRestaurantOutline,
   IoCarOutline,
   IoBeerOutline,
   IoHeartOutline,
@@ -78,7 +78,7 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
   const router = useRouter();
   const { account } = useWeb3React();
   const isConnected = !!account;
-  
+
   const [hotel, setHotel] = useState<Hotel | null>(initialHotel);
   const [loading, setLoading] = useState(!initialHotel);
   const [error, setError] = useState<string | null>(null);
@@ -100,12 +100,12 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
     try {
       setLoading(true);
       setError(null);
-      
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hotels/${router.query.id}`);
       if (!response.ok) {
         throw new Error('Failed to fetch hotel details');
       }
-      
+
       const data = await response.json();
       setHotel(data);
     } catch (error) {
@@ -127,14 +127,14 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
   useEffect(() => {
     if (router.isReady && isInitialLoad) {
       const { checkIn: checkInQuery, checkOut: checkOutQuery, guests } = router.query;
-      
+
       if (checkInQuery) {
         const checkInDate = new Date(checkInQuery as string);
         if (!isNaN(checkInDate.getTime()) && checkInDate >= today) {
           setCheckIn(checkInDate);
         }
       }
-      
+
       if (checkOutQuery) {
         const checkOutDate = new Date(checkOutQuery as string);
         if (!isNaN(checkOutDate.getTime()) && checkOutDate > today) {
@@ -145,7 +145,7 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
       if (guests) {
         setSelectedGuests(Number(guests));
       }
-      
+
       setIsInitialLoad(false);
     }
   }, [router.isReady, today, isInitialLoad]);
@@ -161,7 +161,7 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
       };
 
       // Remove undefined values
-      Object.keys(newQuery).forEach(key => 
+      Object.keys(newQuery).forEach(key =>
         newQuery[key] === undefined && delete newQuery[key]
       );
 
@@ -285,7 +285,7 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
             src={hotel?.image || '/images/default-hotel.jpg'}
             alt={hotel?.name || 'Hotel'}
             fill
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 100vw, 100vw"
+            sizes="100vw"
             className="object-cover"
             priority
           />
@@ -319,6 +319,7 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
                     src={typeof hotel.images[0] === 'string' ? hotel.images[0] : hotel.images[0]?.url || '/images/placeholder.jpg'}
                     alt={hotel.name}
                     fill
+                    sizes="(max-width: 768px) 100vw, 66vw"
                     className="object-cover"
                     priority
                   />
@@ -332,6 +333,7 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
                         src={typeof image === 'string' ? image : image.url}
                         alt={`${hotel.name} gallery ${index + 1}`}
                         fill
+                        sizes="(max-width: 768px) 33vw, 22vw"
                         className="object-cover"
                       />
                     </div>
@@ -411,9 +413,8 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
                       {hotel.rooms.map((room) => (
                         <div
                           key={room._id}
-                          className={`bg-[#0B1120] rounded-lg p-6 ${
-                            isRoomAvailable(room) ? 'opacity-100' : 'opacity-50'
-                          }`}
+                          className={`bg-[#0B1120] rounded-lg p-6 ${isRoomAvailable(room) ? 'opacity-100' : 'opacity-50'
+                            }`}
                         >
                           <div className="flex justify-between items-start mb-2">
                             <div>
@@ -463,7 +464,7 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
                                     alt={`${room.type} view ${index + 1}`}
                                     fill
                                     className="object-cover hover:opacity-80 transition-opacity"
-                                    sizes="(max-width: 768px) 50vw, 33vw"
+                                    sizes="(max-width: 768px) 50vw, 16vw"
                                   />
                                 </div>
                               ))}

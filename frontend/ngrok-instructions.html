@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ngrok Setup Instructions</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1,
+        h2,
+        h3 {
+            color: #2563eb;
+        }
+
+        pre {
+            background-color: #f1f5f9;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+
+        code {
+            font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+        }
+
+        .step {
+            margin-bottom: 30px;
+            padding: 20px;
+            border-left: 4px solid #2563eb;
+            background-color: #f8fafc;
+        }
+
+        img {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+
+        .note {
+            background-color: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 10px 15px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Setting up ngrok for QR Code Mobile Access</h1>
+
+    <p>This guide will help you set up ngrok to create a public URL for your local development server, allowing mobile
+        devices to access your booking confirmation pages via QR codes.</p>
+
+    <div class="note">
+        <strong>Note:</strong> ngrok provides temporary public URLs that forward to your local development server. These
+        URLs change each time you restart ngrok unless you have a paid account.
+    </div>
+
+    <div class="step">
+        <h2>Step 1: Download ngrok</h2>
+        <p>First, download ngrok from the official website:</p>
+        <p><a href="https://ngrok.com/download" target="_blank">https://ngrok.com/download</a></p>
+        <p>Choose the version that matches your operating system (Windows, macOS, Linux).</p>
+    </div>
+
+    <div class="step">
+        <h2>Step 2: Extract the Downloaded File</h2>
+        <p>Extract the downloaded zip file to a location of your choice. You'll get a single executable file named
+            <code>ngrok</code> or <code>ngrok.exe</code> (on Windows).</p>
+    </div>
+
+    <div class="step">
+        <h2>Step 3: Start Your Next.js Development Server</h2>
+        <p>Make sure your Next.js development server is running on port 3000:</p>
+        <pre><code>cd frontend
+npm run dev</code></pre>
+    </div>
+
+    <div class="step">
+        <h2>Step 4: Start ngrok</h2>
+        <p>Open a new terminal/command prompt window, navigate to the folder where you extracted ngrok, and run:</p>
+        <pre><code>ngrok http 3000</code></pre>
+        <p>You should see output similar to this:</p>
+        <pre><code>Session Status                online
+Account                       (No account)
+Version                       3.3.1
+Region                        United States (us)
+Latency                       51ms
+Web Interface                 http://127.0.0.1:4040
+Forwarding                    https://abcd-123-45-678-90.ngrok-free.app -> http://localhost:3000</code></pre>
+    </div>
+
+    <div class="step">
+        <h2>Step 5: Copy the Forwarding URL</h2>
+        <p>Copy the HTTPS forwarding URL from the ngrok output (e.g.,
+            <code>https://abcd-123-45-678-90.ngrok-free.app</code>).</p>
+    </div>
+
+    <div class="step">
+        <h2>Step 6: Use the URL in the QR Code Modal</h2>
+        <p>When generating a QR code in the application:</p>
+        <ol>
+            <li>Click on "Generate QR Code" for any booking</li>
+            <li>In the QR code modal, paste the ngrok URL into the "Public URL" field</li>
+            <li>The QR code will now be generated with the public ngrok URL</li>
+            <li>This QR code can be scanned from any mobile device to access the booking confirmation</li>
+        </ol>
+    </div>
+
+    <div class="note">
+        <h3>Important Notes:</h3>
+        <ul>
+            <li>The free version of ngrok provides randomly generated URLs that change each time you restart ngrok</li>
+            <li>You need to update the URL in the QR code modal each time you restart ngrok</li>
+            <li>Keep the ngrok terminal window open while you're using the public URL</li>
+            <li>If you close the ngrok terminal or your computer goes to sleep, the public URL will stop working</li>
+        </ul>
+    </div>
+
+    <h2>Troubleshooting</h2>
+
+    <h3>ngrok Command Not Found</h3>
+    <p>If you get a "command not found" error, you need to run ngrok from the directory where the executable is located,
+        or add it to your system's PATH.</p>
+
+    <h3>Port Already in Use</h3>
+    <p>If port 3000 is already in use by another application, you can change the port in your Next.js configuration and
+        update the ngrok command accordingly.</p>
+
+    <h3>QR Code Not Working</h3>
+    <p>Make sure:</p>
+    <ul>
+        <li>The ngrok tunnel is still running</li>
+        <li>Your Next.js development server is running</li>
+        <li>You've entered the correct ngrok URL in the QR code modal</li>
+    </ul>
+</body>
+
+</html>
