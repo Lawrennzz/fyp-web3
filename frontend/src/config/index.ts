@@ -1,7 +1,7 @@
 export const config = {
   // Contract addresses - using newly deployed Hardhat addresses
-  HOTEL_BOOKING_CONTRACT: '0xe5998cDD7dF5025eC86018bBEaF29Fc2Bc36A0e4',
-  USDT_CONTRACT: '0x718874d3349dd5ab7332364B182dcD8fA224683d',
+  HOTEL_BOOKING_CONTRACT: '0x9D088f095e7a7AC0618230b9D150fD0Cd0Ebc943',
+  USDT_CONTRACT: '0x1C82a16fa526B924010aBAcFee86E4c31427ac56',
 
   // Network configuration
   NETWORK_ID: 1337, // Local Network

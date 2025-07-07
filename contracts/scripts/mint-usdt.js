@@ -3,7 +3,9 @@ const fs = require("fs");
 const path = require("path");
 
 async function main() {
-  const userAddress = "0x197ed06Cb269f1725D456701C0a1A33FAaD124eD";
+  // Get the first signer (account)
+  const [signer] = await ethers.getSigners();
+  const userAddress = await signer.getAddress();
   const amount = ethers.parseUnits("10000", 18); // 10,000 USDT
 
   // Read USDT address from deployment file

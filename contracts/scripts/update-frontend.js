@@ -1,49 +1,67 @@
 const fs = require('fs');
 const path = require('path');
 
-async function main() {
-  const network = process.argv[2]; // Get network from command line
-  
-  if (!network) {
-    console.error('Please specify a network (sepolia, mumbai, or localhost)');
-    process.exit(1);
-  }
-  
-  // Read deployment info
-  const deploymentFile = `deployment-${network}.json`;
-  
-  if (!fs.existsSync(deploymentFile)) {
-    console.error(`Deployment file ${deploymentFile} not found. Please deploy to ${network} first.`);
-    process.exit(1);
-  }
-  
-  const deploymentInfo = JSON.parse(fs.readFileSync(deploymentFile, 'utf8'));
-  const contractAddress = deploymentInfo.contractAddress;
-  
-  console.log(`Updating frontend with contract address: ${contractAddress} (${network})`);
-  
-  // Path to the frontend contract utility file
-  const frontendPath = path.join(__dirname, '../../frontend/src/utils/HotelBookingContract.js');
-  
-  // Read the file
-  let contractJs = fs.readFileSync(frontendPath, 'utf8');
-  
-  // Update the address in the file
-  const addressRegex = new RegExp(`${network}:\\s*"0x[0-9a-fA-F]{0,40}"`, 'g');
-  const replacement = `${network}: "${contractAddress}"`;
-  
-  contractJs = contractJs.replace(addressRegex, replacement);
-  
-  // Write the updated file
-  fs.writeFileSync(frontendPath, contractJs);
-  
-  console.log(`Frontend updated successfully!`);
-  console.log(`Contract address for ${network} set to ${contractAddress}`);
+// Define paths
+const hotelBookingArtifactPath = path.join(__dirname, '../artifacts/contracts/HotelBooking.sol/HotelBooking.json');
+const testUSDTArtifactPath = path.join(__dirname, '../artifacts/contracts/TestUSDT.sol/TestUSDT.json');
+const frontendContractsDir = path.join(__dirname, '../../frontend/src/contracts');
+
+// Ensure the frontend contracts directory exists
+if (!fs.existsSync(frontendContractsDir)) {
+  fs.mkdirSync(frontendContractsDir, { recursive: true });
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch(error => {
-    console.error(error);
-    process.exit(1);
-  }); 
+// Read deployment addresses
+const deploymentPath = path.join(__dirname, '../deployment.json');
+let deployment = {};
+if (fs.existsSync(deploymentPath)) {
+  deployment = JSON.parse(fs.readFileSync(deploymentPath, 'utf8'));
+}
+
+// Copy HotelBooking contract
+if (fs.existsSync(hotelBookingArtifactPath)) {
+  const hotelBookingArtifact = JSON.parse(fs.readFileSync(hotelBookingArtifactPath, 'utf8'));
+  fs.writeFileSync(
+    path.join(frontendContractsDir, 'HotelBooking.json'),
+    JSON.stringify(hotelBookingArtifact, null, 2)
+  );
+  console.log('✅ HotelBooking contract ABI updated');
+} else {
+  console.error('❌ HotelBooking artifact not found');
+}
+
+// Copy TestUSDT contract
+if (fs.existsSync(testUSDTArtifactPath)) {
+  const testUSDTArtifact = JSON.parse(fs.readFileSync(testUSDTArtifactPath, 'utf8'));
+  fs.writeFileSync(
+    path.join(frontendContractsDir, 'TestUSDT.json'),
+    JSON.stringify(testUSDTArtifact, null, 2)
+  );
+  console.log('✅ TestUSDT contract ABI updated');
+} else {
+  console.error('❌ TestUSDT artifact not found');
+}
+
+// Update config file with contract addresses
+const configPath = path.join(__dirname, '../../frontend/src/config/index.ts');
+if (fs.existsSync(configPath) && deployment.hotelBookingAddress && deployment.usdtAddress) {
+  let configContent = fs.readFileSync(configPath, 'utf8');
+
+  // Update contract addresses
+  configContent = configContent.replace(
+    /HOTEL_BOOKING_CONTRACT: ['"`].*['"`]/,
+    `HOTEL_BOOKING_CONTRACT: '${deployment.hotelBookingAddress}'`
+  );
+
+  configContent = configContent.replace(
+    /USDT_CONTRACT: ['"`].*['"`]/,
+    `USDT_CONTRACT: '${deployment.usdtAddress}'`
+  );
+
+  fs.writeFileSync(configPath, configContent);
+  console.log('✅ Frontend config updated with contract addresses');
+} else {
+  console.error('❌ Could not update frontend config (file not found or missing addresses)');
+}
+
+console.log('Frontend contract files update completed'); 

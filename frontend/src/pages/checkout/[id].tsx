@@ -13,9 +13,9 @@ import { useFirebase } from '../../contexts/FirebaseContext';
 import { addDoc, collection, Timestamp } from 'firebase/firestore';
 import { config } from '../../config';
 
-interface CheckoutProps {}
+interface CheckoutProps { }
 
-export default function Checkout({}: CheckoutProps) {
+export default function Checkout({ }: CheckoutProps) {
   const router = useRouter();
   const { account, provider } = useWeb3React<Web3Provider>();
   const { db } = useFirebase();
@@ -106,8 +106,8 @@ export default function Checkout({}: CheckoutProps) {
       const hotelContract = new ethers.Contract(hotelBookingAddress, HotelBookingABI.abi, signer);
       const usdtContract = new ethers.Contract(usdtAddress, TestUSDTABI.abi, signer);
 
-      // Convert total price to wei (assuming price is in USDT with 6 decimals)
-      const totalPriceWei = ethers.utils.parseUnits(totalPrice as string, 6);
+      // Convert total price to wei (assuming price is in USDT with 18 decimals)
+      const totalPriceWei = ethers.utils.parseUnits(totalPrice as string, 18);
 
       // Approve USDT spending
       const approveTx = await usdtContract.approve(hotelBookingAddress, totalPriceWei);
