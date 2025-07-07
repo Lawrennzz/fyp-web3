@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { 
+import {
   User as FirebaseUser,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -20,6 +20,7 @@ import { db } from '../config/firebase';
 interface AuthContextType {
   user: FirebaseUser | null;
   isAdmin: boolean;
+  isHotelOwner: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -31,12 +32,13 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isAdmin: false,
-  signIn: async () => {},
-  signUp: async () => {},
-  signOut: async () => {},
+  isHotelOwner: false,
+  signIn: async () => { },
+  signUp: async () => { },
+  signOut: async () => { },
   loading: true,
   signInWithGoogle: async () => { throw new Error('Not implemented'); },
-  logOut: async () => {}
+  logOut: async () => { }
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -44,6 +46,7 @@ export const useAuth = () => useContext(AuthContext);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isHotelOwner, setIsHotelOwner] = useState(false);
   const [loading, setLoading] = useState(true);
   const auth = getAuth(app);
   const db = getFirestore(app);
@@ -62,23 +65,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await setDoc(userDocRef, {
               email: user.email,
               isAdmin: false,
+              isHotelOwner: false,
               createdAt: new Date(),
               lastSignIn: new Date()
             });
             setIsAdmin(false);
+            setIsHotelOwner(false);
           } else {
             // Update lastSignIn only if document exists
             await updateDoc(userDocRef, {
               lastSignIn: new Date()
             });
             setIsAdmin(userDoc.data()?.isAdmin ?? false);
+            setIsHotelOwner(userDoc.data()?.isHotelOwner ?? false);
           }
         } catch (error) {
           console.error('Error handling user document:', error);
           setIsAdmin(false);
+          setIsHotelOwner(false);
         }
       } else {
         setIsAdmin(false);
+        setIsHotelOwner(false);
       }
       setLoading(false);
     });
@@ -100,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await signOut(auth);
       setUser(null);
       setIsAdmin(false);
+      setIsHotelOwner(false);
     } catch (error) {
       console.error('Error signing out:', error);
       throw error;
@@ -113,6 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await setDoc(userDocRef, {
         email: email,
         isAdmin: false,
+        isHotelOwner: false,
         createdAt: new Date(),
         lastSignIn: new Date()
       });
@@ -126,7 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
-      
+
       // Create or update user document
       const userDocRef = doc(db, 'users', result.user.uid);
       const userDoc = await getDoc(userDocRef);
@@ -135,6 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await setDoc(userDocRef, {
           email: result.user.email,
           isAdmin: false,
+          isHotelOwner: false,
           createdAt: new Date(),
           lastSignIn: new Date(),
           displayName: result.user.displayName,
@@ -160,6 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await signOut(auth);
       setUser(null);
       setIsAdmin(false);
+      setIsHotelOwner(false);
       localStorage.removeItem('lastProvider');
       localStorage.setItem('isDisconnected', 'true');
     } catch (error) {
@@ -173,6 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         isAdmin,
+        isHotelOwner,
         signIn: signInHandler,
         signUp: signUpHandler,
         signOut: signOutHandler,

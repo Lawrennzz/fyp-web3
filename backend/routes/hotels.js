@@ -88,6 +88,8 @@ const transformHotelForFrontend = (hotel) => {
     images: transformedImages,
     description: hotelObj.description || '',
     amenities: hotelObj.amenities || [],
+    ownerId: hotelObj.ownerId || null,
+    blockchainId: hotelObj.blockchainId || null,
     rooms: (hotelObj.rooms || []).map(room => ({
       _id: room._id.toString(),
       type: room.type,
@@ -213,7 +215,28 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create new hotel
+// GET /api/hotels/owner/:ownerId - Get hotels for a specific owner
+router.get('/owner/:ownerId', async (req, res) => {
+  try {
+    const { ownerId } = req.params;
+
+    if (!ownerId) {
+      return res.status(400).json({ message: 'Owner ID is required' });
+    }
+
+    const hotels = await Hotel.find({ ownerId });
+
+    const transformedHotels = hotels.map(transformHotelForFrontend)
+      .filter(hotel => hotel !== null);
+
+    res.json(transformedHotels);
+  } catch (error) {
+    console.error('Error fetching owner hotels:', error);
+    res.status(500).json({ message: 'Error fetching owner hotels', error: error.message });
+  }
+});
+
+// POST /api/hotels - Create new hotel
 router.post('/', async (req, res) => {
   try {
     const hotelData = req.body;
@@ -232,6 +255,142 @@ router.post('/', async (req, res) => {
   } catch (error) {
     console.error('Error creating hotel:', error);
     res.status(500).json({ message: 'Error creating hotel' });
+  }
+});
+
+// POST /api/hotels/:id/rooms - Add a room to a hotel
+router.post('/:id/rooms', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const roomData = req.body;
+
+    // Find the hotel
+    const hotel = await Hotel.findById(id);
+    if (!hotel) {
+      return res.status(404).json({ message: 'Hotel not found' });
+    }
+
+    // Validate room data
+    if (!roomData.type || !roomData.pricePerNight || !roomData.maxGuests) {
+      return res.status(400).json({ message: 'Missing required room fields' });
+    }
+
+    // Validate room amenities if provided
+    if (roomData.amenities && !validateAmenities(roomData.amenities)) {
+      return res.status(400).json({
+        message: 'Invalid room amenities. Must be from the standard list.',
+        validAmenities: standardAmenities
+      });
+    }
+
+    // Add the room to the hotel
+    hotel.rooms.push(roomData);
+    await hotel.save();
+
+    res.status(201).json(hotel);
+  } catch (error) {
+    console.error('Error adding room:', error);
+    res.status(500).json({ message: 'Error adding room', error: error.message });
+  }
+});
+
+// PUT /api/hotels/:hotelId/rooms/:roomId - Update a room
+router.put('/:hotelId/rooms/:roomId', async (req, res) => {
+  try {
+    const { hotelId, roomId } = req.params;
+    const updates = req.body;
+
+    // Find the hotel
+    const hotel = await Hotel.findById(hotelId);
+    if (!hotel) {
+      return res.status(404).json({ message: 'Hotel not found' });
+    }
+
+    // Find the room
+    const roomIndex = hotel.rooms.findIndex(room => room._id.toString() === roomId);
+    if (roomIndex === -1) {
+      return res.status(404).json({ message: 'Room not found' });
+    }
+
+    // Validate room amenities if they're being updated
+    if (updates.amenities && !validateAmenities(updates.amenities)) {
+      return res.status(400).json({
+        message: 'Invalid room amenities. Must be from the standard list.',
+        validAmenities: standardAmenities
+      });
+    }
+
+    // Update room fields
+    Object.keys(updates).forEach(key => {
+      hotel.rooms[roomIndex][key] = updates[key];
+    });
+
+    await hotel.save();
+
+    res.json(hotel);
+  } catch (error) {
+    console.error('Error updating room:', error);
+    res.status(500).json({ message: 'Error updating room', error: error.message });
+  }
+});
+
+// DELETE /api/hotels/:hotelId/rooms/:roomId - Delete a room
+router.delete('/:hotelId/rooms/:roomId', async (req, res) => {
+  try {
+    const { hotelId, roomId } = req.params;
+
+    // Find the hotel
+    const hotel = await Hotel.findById(hotelId);
+    if (!hotel) {
+      return res.status(404).json({ message: 'Hotel not found' });
+    }
+
+    // Remove the room
+    hotel.rooms = hotel.rooms.filter(room => room._id.toString() !== roomId);
+    await hotel.save();
+
+    res.json({ message: 'Room deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting room:', error);
+    res.status(500).json({ message: 'Error deleting room', error: error.message });
+  }
+});
+
+// Generate booking confirmation document
+router.get('/booking-confirmation/:bookingId', async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+
+    // Get booking data from Firebase
+    const bookingRef = db.collection('bookings').doc(bookingId);
+    const bookingDoc = await bookingRef.get();
+
+    if (!bookingDoc.exists) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const bookingData = bookingDoc.data();
+
+    // Generate the confirmation document
+    const invoiceGenerator = new InvoiceGenerator();
+    const { invoiceNumber, path: invoicePath } = await invoiceGenerator.generateInvoice({
+      bookingId,
+      guestName: `${bookingData.guestInfo.firstName} ${bookingData.guestInfo.lastName}`,
+      guestEmail: bookingData.guestInfo.email,
+      hotelName: bookingData.hotelDetails.name,
+      roomType: bookingData.roomDetails.type,
+      checkIn: bookingData.checkIn.toDate(),
+      checkOut: bookingData.checkOut.toDate(),
+      totalAmount: bookingData.totalPrice,
+      paymentMethod: 'USDT',
+      transactionHash: bookingData.transactionHash
+    });
+
+    // Send the PDF file
+    res.sendFile(invoicePath);
+  } catch (error) {
+    console.error('Error generating booking confirmation:', error);
+    res.status(500).json({ error: 'Failed to generate booking confirmation' });
   }
 });
 
@@ -276,44 +435,6 @@ router.delete('/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting hotel:', error);
     res.status(500).json({ message: 'Error deleting hotel' });
-  }
-});
-
-// Generate booking confirmation document
-router.get('/booking-confirmation/:bookingId', async (req, res) => {
-  try {
-    const { bookingId } = req.params;
-
-    // Get booking data from Firebase
-    const bookingRef = db.collection('bookings').doc(bookingId);
-    const bookingDoc = await bookingRef.get();
-
-    if (!bookingDoc.exists) {
-      return res.status(404).json({ error: 'Booking not found' });
-    }
-
-    const bookingData = bookingDoc.data();
-
-    // Generate the confirmation document
-    const invoiceGenerator = new InvoiceGenerator();
-    const { invoiceNumber, path: invoicePath } = await invoiceGenerator.generateInvoice({
-      bookingId,
-      guestName: `${bookingData.guestInfo.firstName} ${bookingData.guestInfo.lastName}`,
-      guestEmail: bookingData.guestInfo.email,
-      hotelName: bookingData.hotelDetails.name,
-      roomType: bookingData.roomDetails.type,
-      checkIn: bookingData.checkIn.toDate(),
-      checkOut: bookingData.checkOut.toDate(),
-      totalAmount: bookingData.totalPrice,
-      paymentMethod: 'USDT',
-      transactionHash: bookingData.transactionHash
-    });
-
-    // Send the PDF file
-    res.sendFile(invoicePath);
-  } catch (error) {
-    console.error('Error generating booking confirmation:', error);
-    res.status(500).json({ error: 'Failed to generate booking confirmation' });
   }
 });
 

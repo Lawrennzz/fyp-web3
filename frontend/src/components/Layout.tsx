@@ -22,7 +22,7 @@ export default function Layout({ children }: LayoutProps) {
   const { useAccount, useIsActive } = hooks;
   const account = useAccount();
   const isActive = useIsActive();
-  const { user } = useAuth();
+  const { user, isAdmin, isHotelOwner } = useAuth();
   const { walletAddress } = useWalletConnect();
   const [isGoogleUser, setIsGoogleUser] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
@@ -199,6 +199,28 @@ export default function Layout({ children }: LayoutProps) {
                   >
                     My Bookings
                   </Link>
+                  {isHotelOwner && (
+                    <Link
+                      href="/owner"
+                      className={`${router.pathname.startsWith('/owner')
+                        ? 'text-white'
+                        : 'text-gray-300 hover:text-white'
+                        } px-3 py-2 rounded-md text-sm font-medium transition-colors`}
+                    >
+                      Hotel Owner
+                    </Link>
+                  )}
+                  {isAdmin && (
+                    <Link
+                      href="/admin"
+                      className={`${router.pathname.startsWith('/admin')
+                        ? 'text-white'
+                        : 'text-gray-300 hover:text-white'
+                        } px-3 py-2 rounded-md text-sm font-medium transition-colors`}
+                    >
+                      Admin
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>

@@ -55,7 +55,15 @@ const hotelSchema = new mongoose.Schema({
     default: 0
   },
   amenities: [String],
-  rooms: [roomSchema]
+  rooms: [roomSchema],
+  ownerId: {
+    type: String,
+    required: false
+  },
+  blockchainId: {
+    type: String,
+    required: false
+  }
 });
 
 // Create indexes for search
@@ -63,19 +71,20 @@ hotelSchema.index({ 'location.city': 1, 'location.country': 1 });
 hotelSchema.index({ rating: -1 });
 hotelSchema.index({ 'rooms.pricePerNight': 1 });
 hotelSchema.index({ 'rooms.maxGuests': 1 });
+hotelSchema.index({ ownerId: 1 });
 
 // Method to check room availability
-roomSchema.methods.isAvailableForDates = function(checkIn, checkOut) {
+roomSchema.methods.isAvailableForDates = function (checkIn, checkOut) {
   if (!this.bookings || this.bookings.length === 0) return true;
-  
+
   return !this.bookings.some(booking => {
     if (booking.status === 'cancelled') return false;
-    
+
     const bookingStart = new Date(booking.checkIn);
     const bookingEnd = new Date(booking.checkOut);
     const requestStart = new Date(checkIn);
     const requestEnd = new Date(checkOut);
-    
+
     return (
       (requestStart >= bookingStart && requestStart < bookingEnd) ||
       (requestEnd > bookingStart && requestEnd <= bookingEnd) ||
