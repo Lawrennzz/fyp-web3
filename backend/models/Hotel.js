@@ -1,5 +1,16 @@
 const mongoose = require('mongoose');
 
+const imageSchema = new mongoose.Schema({
+  url: {
+    type: String,
+    required: true
+  },
+  alt: {
+    type: String,
+    default: ''
+  }
+});
+
 const roomSchema = new mongoose.Schema({
   type: {
     type: String,
@@ -15,7 +26,10 @@ const roomSchema = new mongoose.Schema({
     required: true
   },
   amenities: [String],
-  images: [String],
+  images: {
+    type: [imageSchema],
+    default: [{ url: 'https://images.unsplash.com/photo-1566665797739-1674de7a421a', alt: 'Default Room Image' }]
+  },
   bookings: [{
     checkIn: Date,
     checkOut: Date,
@@ -47,7 +61,10 @@ const hotelSchema = new mongoose.Schema({
     }
   },
   image: String,
-  images: [String],
+  images: {
+    type: [imageSchema],
+    default: []
+  },
   rating: {
     type: Number,
     min: 0,

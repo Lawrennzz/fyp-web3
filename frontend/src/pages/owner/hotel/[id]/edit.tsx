@@ -1,0 +1,409 @@
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import Layout from '../../../../components/Layout';
+import { useAuth } from '../../../../contexts/FirebaseContext';
+import axios from 'axios';
+import { config } from '../../../../config';
+import Link from 'next/link';
+
+interface FormData {
+    name: string;
+    description: string;
+    location: {
+        city: string;
+        country: string;
+        address: string;
+    };
+    image: string;
+    rating: number;
+    amenities: string[];
+}
+
+const standardAmenities = [
+    'WiFi',
+    'Pool',
+    'Spa & Wellness',
+    'Restaurant',
+    'Bar',
+    'Gym',
+    'Parking',
+    'Room Service',
+    'Air Conditioning',
+    'Conference Room',
+    'Pet Friendly',
+    'Family Friendly'
+];
+
+export default function EditHotel() {
+    const { user, isHotelOwner, loading } = useAuth();
+    const router = useRouter();
+    const { id } = router.query;
+
+    const [formData, setFormData] = useState<FormData>({
+        name: '',
+        description: '',
+        location: {
+            city: '',
+            country: '',
+            address: ''
+        },
+        image: '',
+        rating: 0,
+        amenities: []
+    });
+
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [message, setMessage] = useState<string | null>(null);
+
+    // Fetch hotel details
+    useEffect(() => {
+        const fetchHotel = async () => {
+            if (!id || !user) return;
+
+            try {
+                setIsLoading(true);
+                console.log('Fetching hotel with ID:', id);
+
+                // Use the regular hotels endpoint
+                const response = await axios.get(`${config.API_URL}/api/hotels/${id}`);
+                const hotel = response.data;
+
+                // For the specific user, always allow access
+                if (user.uid === '1ZN9NxYGozUbFAudlXoyloyfnhL2' || hotel.ownerId === user.uid) {
+                    // Populate form data
+                    setFormData({
+                        name: hotel.name || '',
+                        description: hotel.description || '',
+                        location: {
+                            city: hotel.location?.city || '',
+                            country: hotel.location?.country || '',
+                            address: hotel.location?.address || ''
+                        },
+                        image: hotel.image || '',
+                        rating: hotel.rating || 0,
+                        amenities: hotel.amenities || []
+                    });
+                    setError(null);
+                } else {
+                    // For other users, verify ownership normally
+                    setError('You do not have permission to edit this hotel.');
+                }
+            } catch (err: any) {
+                console.error('Error fetching hotel:', err);
+                setError('Failed to load hotel details. Please try again later.');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        if (id && user) {
+            fetchHotel();
+        }
+    }, [id, user]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void => {
+        const { name, value } = e.target;
+
+        if (name.includes('.')) {
+            // Handle nested properties like location.city
+            const [parent, child] = name.split('.');
+            if (parent === 'location') {
+                setFormData({
+                    ...formData,
+                    location: {
+                        ...formData.location,
+                        [child]: value
+                    }
+                });
+            }
+        } else {
+            setFormData({
+                ...formData,
+                [name]: value
+            });
+        }
+    };
+
+    const handleAmenityChange = (amenity: string): void => {
+        if (formData.amenities.includes(amenity)) {
+            setFormData({
+                ...formData,
+                amenities: formData.amenities.filter(a => a !== amenity)
+            });
+        } else {
+            setFormData({
+                ...formData,
+                amenities: [...formData.amenities, amenity]
+            });
+        }
+    };
+
+    const handleSubmit = async (e: React.FormEvent): Promise<void> => {
+        e.preventDefault();
+
+        if (!user || !id) {
+            setError('You must be logged in to update a hotel');
+            return;
+        }
+
+        setIsSubmitting(true);
+        setError(null);
+        setMessage(null);
+
+        try {
+            const hotelData = {
+                name: formData.name,
+                description: formData.description,
+                location: formData.location,
+                image: formData.image,
+                rating: Number(formData.rating),
+                amenities: formData.amenities
+            };
+
+            const response = await axios.put(`${config.API_URL}/api/hotels/${id}`, hotelData);
+
+            setMessage('Hotel updated successfully!');
+            setTimeout(() => {
+                router.push(`/owner/hotel/${id}`);
+            }, 1500);
+        } catch (err: any) {
+            console.error('Error updating hotel:', err);
+            setError(err.response?.data?.message || 'Failed to update hotel. Please try again.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    // Redirect if not logged in or not a hotel owner
+    if (!loading && (!user || !isHotelOwner)) {
+        return (
+            <Layout>
+                <div className="container mx-auto px-4 py-8">
+                    <div className="bg-red-900/30 border border-red-500 text-red-300 p-4 mb-6 rounded-lg">
+                        <h2 className="text-xl font-bold mb-4">🔍 Hotel Owner Access Required</h2>
+                        <p>You need hotel owner privileges to access this page.</p>
+                        <div className="mt-4">
+                            <button
+                                onClick={() => router.push('/')}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                Go to Home
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </Layout>
+        );
+    }
+
+    if (isLoading) {
+        return (
+            <Layout>
+                <div className="min-h-screen bg-[#0B1120]">
+                    <div className="container mx-auto px-6 py-8">
+                        <div className="flex justify-center items-center h-64">
+                            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+                        </div>
+                    </div>
+                </div>
+            </Layout>
+        );
+    }
+
+    if (error) {
+        return (
+            <Layout>
+                <div className="min-h-screen bg-[#0B1120]">
+                    <div className="container mx-auto px-6 py-8">
+                        <div className="bg-red-900/30 border border-red-500 text-red-300 p-4 mb-6 rounded-lg">
+                            <h2 className="text-xl font-bold mb-2">Error</h2>
+                            <p>{error}</p>
+                            <div className="mt-4">
+                                <button
+                                    onClick={() => router.push(`/owner/hotel/${id}`)}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                    Back to Hotel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Layout>
+        );
+    }
+
+    return (
+        <Layout>
+            <div className="min-h-screen bg-[#0B1120]">
+                <div className="container mx-auto px-6 py-8">
+                    <div className="flex justify-between items-center mb-8">
+                        <h1 className="text-3xl font-bold text-white">Edit Hotel</h1>
+                        <Link href={`/owner/hotel/${id}`} className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors">
+                            Back to Hotel
+                        </Link>
+                    </div>
+
+                    {message && (
+                        <div className="bg-green-900/30 border border-green-500 text-green-300 p-4 mb-6 rounded-lg">
+                            <p>{message}</p>
+                        </div>
+                    )}
+
+                    <form onSubmit={handleSubmit} className="bg-gray-800 shadow-xl rounded-xl overflow-hidden border border-gray-700 p-6 mb-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-6">
+                                <div>
+                                    <label htmlFor="name" className="block text-gray-300 mb-2">Hotel Name</label>
+                                    <input
+                                        type="text"
+                                        id="name"
+                                        name="name"
+                                        value={formData.name}
+                                        onChange={handleChange}
+                                        required
+                                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="Enter hotel name"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label htmlFor="description" className="block text-gray-300 mb-2">Description</label>
+                                    <textarea
+                                        id="description"
+                                        name="description"
+                                        value={formData.description}
+                                        onChange={handleChange}
+                                        required
+                                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-32"
+                                        placeholder="Enter hotel description"
+                                    ></textarea>
+                                </div>
+
+                                <div>
+                                    <label htmlFor="city" className="block text-gray-300 mb-2">City</label>
+                                    <input
+                                        type="text"
+                                        id="city"
+                                        name="location.city"
+                                        value={formData.location.city}
+                                        onChange={handleChange}
+                                        required
+                                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="Enter city"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label htmlFor="country" className="block text-gray-300 mb-2">Country</label>
+                                    <input
+                                        type="text"
+                                        id="country"
+                                        name="location.country"
+                                        value={formData.location.country}
+                                        onChange={handleChange}
+                                        required
+                                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="Enter country"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-6">
+                                <div>
+                                    <label htmlFor="address" className="block text-gray-300 mb-2">Address</label>
+                                    <input
+                                        type="text"
+                                        id="address"
+                                        name="location.address"
+                                        value={formData.location.address}
+                                        onChange={handleChange}
+                                        required
+                                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="Enter address"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label htmlFor="rating" className="block text-gray-300 mb-2">Rating (0-10)</label>
+                                    <input
+                                        type="number"
+                                        id="rating"
+                                        name="rating"
+                                        value={formData.rating}
+                                        onChange={handleChange}
+                                        min="0"
+                                        max="10"
+                                        step="0.1"
+                                        required
+                                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label htmlFor="image" className="block text-gray-300 mb-2">Image URL</label>
+                                    <input
+                                        type="text"
+                                        id="image"
+                                        name="image"
+                                        value={formData.image}
+                                        onChange={handleChange}
+                                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="Enter image URL (optional)"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-gray-300 mb-2">Amenities</label>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                        {standardAmenities.map((amenity) => (
+                                            <div key={amenity} className="flex items-center">
+                                                <input
+                                                    type="checkbox"
+                                                    id={`amenity-${amenity}`}
+                                                    name="amenities"
+                                                    value={amenity}
+                                                    checked={formData.amenities.includes(amenity)}
+                                                    onChange={() => handleAmenityChange(amenity)}
+                                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-600 rounded bg-gray-700"
+                                                />
+                                                <label htmlFor={`amenity-${amenity}`} className="ml-2 text-gray-300">
+                                                    {amenity}
+                                                </label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end mt-8 space-x-4">
+                            <Link href={`/owner/hotel/${id}`} className="px-6 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors">
+                                Cancel
+                            </Link>
+                            <button
+                                type="submit"
+                                disabled={isSubmitting}
+                                className={`px-6 py-3 ${isSubmitting ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-lg transition-colors flex items-center`}
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Updating...
+                                    </>
+                                ) : (
+                                    <>Save Changes</>
+                                )}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </Layout>
+    );
+} 
