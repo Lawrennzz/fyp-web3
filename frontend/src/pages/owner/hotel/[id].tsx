@@ -6,7 +6,7 @@ import { useFirebase } from '../../../contexts/FirebaseContext';
 import Link from 'next/link';
 import axios from 'axios';
 import { config } from '../../../config';
-import IPFSUploader from '../../../components/IPFSUploader';
+import EnhancedIPFSUploader from '../../../components/EnhancedIPFSUploader';
 
 interface Room {
     _id: string;
@@ -482,7 +482,7 @@ export default function HotelManagement() {
 
                                     {/* Room Images */}
                                     <div className="mt-4">
-                                        <IPFSUploader onUploadComplete={handleRoomImageUpload} />
+                                        <EnhancedIPFSUploader onUploadComplete={handleRoomImageUpload} uploadType="room-image" />
 
                                         {newRoom.images.length > 0 && (
                                             <div className="mt-4">

@@ -5,7 +5,7 @@ import { Contract } from '@ethersproject/contracts';
 
 // Initialize MetaMask connector with options
 export const [metaMask, hooks] = initializeConnector<MetaMask>(
-  (actions) => new MetaMask({ 
+  (actions) => new MetaMask({
     actions,
     options: {
       // Allow eager connection if previously connected
@@ -29,15 +29,15 @@ if (typeof window !== 'undefined') {
 export const getContract = (
   address: string,
   abi: any,
-  provider: Web3Provider
+  signerOrProvider: Web3Provider | any
 ): Contract => {
-  return new Contract(address, abi, provider.getSigner());
+  return new Contract(address, abi, signerOrProvider);
 };
 
 export type Web3ContextType = {
   active: boolean;
   account: string | null | undefined;
-  library: Web3Provider | undefined;
+  provider: Web3Provider | undefined;
   connector: MetaMask | undefined;
   activate: (connector: MetaMask) => Promise<void>;
   deactivate: () => void;

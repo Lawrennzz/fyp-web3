@@ -10,7 +10,7 @@ import HotelBookingABI from '../../contracts/HotelBooking.json';
 import { config } from '../../config';
 import { doc, setDoc } from 'firebase/firestore';
 import { useFirebase } from '../../contexts/FirebaseContext';
-import IPFSUploader from '../../components/IPFSUploader';
+import EnhancedIPFSUploader from '../../components/EnhancedIPFSUploader';
 import axios from 'axios';
 
 // Standard amenities list
@@ -39,7 +39,7 @@ const roomTypes = [
 ];
 
 export default function RegisterHotel() {
-    const { account, library } = useWeb3React<Web3Provider>();
+    const { account, provider } = useWeb3React<Web3Provider>();
     const { isHotelOwner, user } = useAuth();
     const router = useRouter();
     const { db } = useFirebase();
@@ -124,16 +124,17 @@ export default function RegisterHotel() {
     };
 
     const registerHotelOnBlockchain = async () => {
-        if (!library || !account) {
+        if (!provider || !account) {
             setError('Wallet not connected');
             return null;
         }
 
         try {
+            const signer = provider.getSigner();
             const contract = getContract(
                 config.HOTEL_BOOKING_CONTRACT,
                 HotelBookingABI.abi,
-                library.getSigner()
+                signer
             );
 
             // Register hotel on blockchain
@@ -420,7 +421,10 @@ export default function RegisterHotel() {
 
                             {/* Image Upload */}
                             <div className="mt-6">
-                                <IPFSUploader onUploadComplete={(urls: string[]) => setImageUrls([...imageUrls, ...urls])} />
+                                <EnhancedIPFSUploader
+                                    onUploadComplete={(urls: string[]) => setImageUrls([...imageUrls, ...urls])}
+                                    uploadType="hotel-image"
+                                />
 
                                 {imageUrls.length > 0 && (
                                     <div className="mt-4">
@@ -551,7 +555,11 @@ export default function RegisterHotel() {
 
                                     {/* Room Images */}
                                     <div className="mt-4">
-                                        <IPFSUploader onUploadComplete={(urls) => handleRoomImageUpload(index, urls)} />
+                                        <EnhancedIPFSUploader
+                                            onUploadComplete={(urls: string[]) => handleRoomImageUpload(index, urls)}
+                                            uploadType="room-image"
+                                            metadata={{ roomType: room.type }}
+                                        />
 
                                         {room.images.length > 0 && (
                                             <div className="mt-4">
