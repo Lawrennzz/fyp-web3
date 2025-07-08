@@ -5,6 +5,7 @@ import { useAuth } from '../../../../contexts/FirebaseContext';
 import axios from 'axios';
 import { config } from '../../../../config';
 import Link from 'next/link';
+import { STANDARD_AMENITIES } from '../../../../utils/constants';
 
 interface FormData {
     name: string;
@@ -18,21 +19,6 @@ interface FormData {
     rating: number;
     amenities: string[];
 }
-
-const standardAmenities = [
-    'WiFi',
-    'Pool',
-    'Spa & Wellness',
-    'Restaurant',
-    'Bar',
-    'Gym',
-    'Parking',
-    'Room Service',
-    'Air Conditioning',
-    'Conference Room',
-    'Pet Friendly',
-    'Family Friendly'
-];
 
 export default function EditHotel() {
     const { user, isHotelOwner, loading } = useAuth();
@@ -358,7 +344,7 @@ export default function EditHotel() {
                                 <div>
                                     <label className="block text-gray-300 mb-2">Amenities</label>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                        {standardAmenities.map((amenity) => (
+                                        {STANDARD_AMENITIES.map((amenity) => (
                                             <div key={amenity} className="flex items-center">
                                                 <input
                                                     type="checkbox"

@@ -19,7 +19,9 @@ import {
   IoTvOutline,
   IoPersonOutline,
   IoBedOutline,
-  IoServerOutline
+  IoServerOutline,
+  IoCalendarOutline,
+  IoBarbellOutline
 } from 'react-icons/io5';
 import { FaSwimmingPool, FaSpa, FaPaw } from 'react-icons/fa';
 import { normalizeImageUrl, PLACEHOLDER_HOTEL_IMAGE } from '../../utils/helpers';
@@ -360,6 +362,7 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
                         {amenity === 'Restaurant' && <IoRestaurantOutline className="w-5 h-5 mr-2" />}
                         {amenity === 'Bar' && <IoBeerOutline className="w-5 h-5 mr-2" />}
                         {amenity === 'Parking' && <IoCarOutline className="w-5 h-5 mr-2" />}
+                        {amenity === 'Gym' && <IoBarbellOutline className="w-5 h-5 mr-2" />}
                         {amenity}
                       </div>
                     ))}
@@ -376,35 +379,48 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
                     <div className="space-y-4">
                       <div>
                         <label className="block text-gray-400 mb-2">Check-in</label>
-                        <input
-                          type="date"
-                          className="w-full px-4 py-2 bg-[#0B1120] border border-gray-700 rounded-lg text-white [color-scheme:dark]"
-                          value={checkIn ? format(checkIn, 'yyyy-MM-dd') : ''}
-                          min={format(today, 'yyyy-MM-dd')}
-                          onChange={(e) => handleCheckInChange(e.target.value ? new Date(e.target.value) : null)}
-                        />
+                        <div className="relative">
+                          <input
+                            type="date"
+                            className="w-full px-4 py-2 bg-[#0B1120] border border-gray-700 rounded-lg text-white [color-scheme:dark] appearance-none [appearance:none] pr-12"
+                            value={checkIn ? format(checkIn, 'yyyy-MM-dd') : ''}
+                            min={format(today, 'yyyy-MM-dd')}
+                            onChange={(e) => handleCheckInChange(e.target.value ? new Date(e.target.value) : null)}
+                          />
+                          <IoCalendarOutline className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 pointer-events-none" />
+                        </div>
                       </div>
                       <div>
                         <label className="block text-gray-400 mb-2">Check-out</label>
-                        <input
-                          type="date"
-                          className="w-full px-4 py-2 bg-[#0B1120] border border-gray-700 rounded-lg text-white [color-scheme:dark]"
-                          value={checkOut ? format(checkOut, 'yyyy-MM-dd') : ''}
-                          min={checkIn ? format(new Date(checkIn.getTime() + 86400000), 'yyyy-MM-dd') : format(tomorrow, 'yyyy-MM-dd')}
-                          onChange={(e) => handleCheckOutChange(e.target.value ? new Date(e.target.value) : null)}
-                        />
+                        <div className="relative">
+                          <input
+                            type="date"
+                            className="w-full px-4 py-2 bg-[#0B1120] border border-gray-700 rounded-lg text-white [color-scheme:dark] appearance-none [appearance:none] pr-12"
+                            value={checkOut ? format(checkOut, 'yyyy-MM-dd') : ''}
+                            min={checkIn ? format(new Date(checkIn.getTime() + 86400000), 'yyyy-MM-dd') : format(tomorrow, 'yyyy-MM-dd')}
+                            onChange={(e) => handleCheckOutChange(e.target.value ? new Date(e.target.value) : null)}
+                          />
+                          <IoCalendarOutline className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 pointer-events-none" />
+                        </div>
                       </div>
                       <div>
                         <label className="block text-gray-400 mb-2">Guests</label>
-                        <select
-                          className="w-full px-4 py-2 bg-[#0B1120] border border-gray-700 rounded-lg text-white"
-                          value={selectedGuests}
-                          onChange={(e) => setSelectedGuests(Number(e.target.value))}
-                        >
-                          {[1, 2, 3, 4].map(num => (
-                            <option key={num} value={num}>{num} Guest{num > 1 ? 's' : ''}</option>
-                          ))}
-                        </select>
+                        <div className="relative">
+                          <select
+                            className="w-full px-4 py-2 bg-[#0B1120] border border-gray-700 rounded-lg text-white appearance-none [appearance:none] pr-10"
+                            value={selectedGuests}
+                            onChange={(e) => setSelectedGuests(Number(e.target.value))}
+                          >
+                            {[1, 2, 3, 4].map(num => (
+                              <option key={num} value={num}>{num} Guest{num > 1 ? 's' : ''}</option>
+                            ))}
+                          </select>
+                          <div className="pointer-events-none absolute right-4 top-1/2 transform -translate-y-1/2">
+                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -448,6 +464,7 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
                                 {amenity === 'Room Service' && <IoServerOutline className="w-5 h-5 mr-2" />}
                                 {amenity === 'Mini Bar' && <IoBeerOutline className="w-5 h-5 mr-2" />}
                                 {amenity === 'Smart TV' && <IoTvOutline className="w-5 h-5 mr-2" />}
+                                {amenity === 'Gym' && <IoBarbellOutline className="w-5 h-5 mr-2" />}
                                 {amenity}
                               </div>
                             ))}
@@ -505,6 +522,8 @@ const getAmenityIcon = (amenity: string) => {
       return <IoCarOutline className={iconClass} />;
     case 'pet-friendly':
       return <FaPaw className={iconClass} />;
+    case 'gym':
+      return <IoBarbellOutline className={iconClass} />;
     default:
       return <IoHeartOutline className={iconClass} />;
   }

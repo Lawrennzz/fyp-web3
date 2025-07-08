@@ -5,19 +5,7 @@ import { useAuth } from '../../contexts/FirebaseContext';
 import axios from 'axios';
 import { config } from '../../config';
 import Link from 'next/link';
-
-const standardAmenities = [
-    'WiFi',
-    'Pool',
-    'Restaurant',
-    'Gym',
-    'Spa & Wellness',
-    'Parking',
-    'Kids-friendly',
-    'Room Service',
-    'Pet-friendly',
-    'Bar'
-];
+import { STANDARD_AMENITIES } from '../../utils/constants';
 
 interface FormData {
     name: string;
@@ -255,7 +243,7 @@ export default function RegisterHotel() {
                                 <div>
                                     <label className="block text-gray-300 mb-2">Amenities</label>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                        {standardAmenities.map((amenity) => (
+                                        {STANDARD_AMENITIES.map((amenity) => (
                                             <div key={amenity} className="flex items-center">
                                                 <input
                                                     type="checkbox"

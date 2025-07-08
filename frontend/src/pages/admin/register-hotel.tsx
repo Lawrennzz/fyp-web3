@@ -10,6 +10,7 @@ import HotelBookingABI from '../../contracts/HotelBooking.json';
 import { config } from '../../config';
 import { doc, setDoc } from 'firebase/firestore';
 import { useFirebase } from '../../contexts/FirebaseContext';
+import { STANDARD_AMENITIES } from '../../utils/constants';
 
 // Import IPFS component if it exists
 let IPFSUploader;
@@ -34,20 +35,6 @@ try {
         </div>
     );
 }
-
-// Standard amenities list
-const standardAmenities = [
-    'WiFi',
-    'Pool',
-    'Restaurant',
-    'Gym',
-    'Spa & Wellness',
-    'Parking',
-    'Kids-friendly',
-    'Room Service',
-    'Pet-friendly',
-    'Bar'
-];
 
 // Room types
 const roomTypes = [
@@ -409,7 +396,7 @@ export default function RegisterHotel() {
                             <div className="mt-6">
                                 <label className="block text-sm font-medium mb-2">Amenities *</label>
                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                    {standardAmenities.map((amenity) => (
+                                    {STANDARD_AMENITIES.map((amenity) => (
                                         <div
                                             key={amenity}
                                             className={`px-4 py-2 rounded-lg cursor-pointer text-center text-sm transition-colors
@@ -540,7 +527,7 @@ export default function RegisterHotel() {
                                     <div className="mt-4">
                                         <label className="block text-sm font-medium mb-2">Room Amenities</label>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                                            {standardAmenities.map((amenity) => (
+                                            {STANDARD_AMENITIES.map((amenity) => (
                                                 <div
                                                     key={amenity}
                                                     className={`px-3 py-1 rounded-lg cursor-pointer text-center text-xs transition-colors
