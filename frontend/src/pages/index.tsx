@@ -8,6 +8,8 @@ import { BsCurrencyDollar } from 'react-icons/bs';
 import type { IconType } from 'react-icons';
 import Image from 'next/image';
 import { config } from '../config';
+import { normalizeImageUrl, PLACEHOLDER_HOTEL_IMAGE } from '../utils/helpers';
+import SafeImage from '../components/SafeImage';
 
 interface Hotel {
   _id: string;
@@ -327,7 +329,7 @@ export default function Home() {
                   onClick={() => router.push(`/hotels/${hotel._id}`)}
                 >
                   <div className="relative h-48 w-full">
-                    <Image
+                    <SafeImage
                       src={hotel.image}
                       alt={hotel.name}
                       fill

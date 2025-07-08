@@ -56,6 +56,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(user);
       if (user) {
         try {
+          // Get user token to check custom claims
+          const idTokenResult = await user.getIdTokenResult();
+          const isAdminClaim = idTokenResult.claims.admin === true;
+          const isHotelOwnerClaim = idTokenResult.claims.hotelOwner === true;
+
           // Check if user document exists
           const userDocRef = doc(db, 'users', user.uid);
           const userDoc = await getDoc(userDocRef);
@@ -64,21 +69,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Create user document if it doesn't exist
             await setDoc(userDocRef, {
               email: user.email,
-              isAdmin: false,
-              isHotelOwner: false,
+              isAdmin: isAdminClaim || false,
+              isHotelOwner: isHotelOwnerClaim || false,
               createdAt: new Date(),
               lastSignIn: new Date()
             });
-            setIsAdmin(false);
-            setIsHotelOwner(false);
+            setIsAdmin(isAdminClaim || false);
+            setIsHotelOwner(isHotelOwnerClaim || false);
           } else {
             // Update lastSignIn only if document exists
             await updateDoc(userDocRef, {
-              lastSignIn: new Date()
+              lastSignIn: new Date(),
+              // Update document with latest claim values
+              isAdmin: isAdminClaim || userDoc.data()?.isAdmin || false,
+              isHotelOwner: isHotelOwnerClaim || userDoc.data()?.isHotelOwner || false
             });
-            setIsAdmin(userDoc.data()?.isAdmin ?? false);
-            setIsHotelOwner(userDoc.data()?.isHotelOwner ?? false);
+            setIsAdmin(isAdminClaim || userDoc.data()?.isAdmin || false);
+            setIsHotelOwner(isHotelOwnerClaim || userDoc.data()?.isHotelOwner || false);
           }
+
+          console.log('User auth state:', {
+            email: user.email,
+            isAdmin: isAdminClaim || userDoc.data()?.isAdmin || false,
+            isHotelOwner: isHotelOwnerClaim || userDoc.data()?.isHotelOwner || false
+          });
         } catch (error) {
           console.error('Error handling user document:', error);
           setIsAdmin(false);

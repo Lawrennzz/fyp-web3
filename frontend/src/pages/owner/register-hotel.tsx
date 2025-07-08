@@ -1,19 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
-import { useWeb3React } from '@web3-react/core';
-import { Web3Provider } from '@ethersproject/providers';
 import { useAuth } from '../../contexts/FirebaseContext';
-import { ethers } from 'ethers';
-import { getContract } from '../../utils/web3Config';
-import HotelBookingABI from '../../contracts/HotelBooking.json';
-import { config } from '../../config';
-import { doc, setDoc } from 'firebase/firestore';
-import { useFirebase } from '../../contexts/FirebaseContext';
-import EnhancedIPFSUploader from '../../components/EnhancedIPFSUploader';
 import axios from 'axios';
+import { config } from '../../config';
+import Link from 'next/link';
 
-// Standard amenities list
 const standardAmenities = [
     'WiFi',
     'Pool',
@@ -27,265 +19,125 @@ const standardAmenities = [
     'Bar'
 ];
 
-// Room types
-const roomTypes = [
-    'Standard',
-    'Deluxe',
-    'Suite',
-    'Executive Suite',
-    'Family Room',
-    'Single Room',
-    'Double Room'
-];
+interface FormData {
+    name: string;
+    description: string;
+    location: {
+        city: string;
+        country: string;
+        address: string;
+    };
+    image: string;
+    rating: number;
+    amenities: string[];
+}
 
 export default function RegisterHotel() {
-    const { account, provider } = useWeb3React<Web3Provider>();
-    const { isHotelOwner, user } = useAuth();
+    const { user, isHotelOwner, loading } = useAuth();
     const router = useRouter();
-    const { db } = useFirebase();
-
-    // Hotel details state
-    const [hotelName, setHotelName] = useState('');
-    const [description, setDescription] = useState('');
-    const [city, setCity] = useState('');
-    const [country, setCountry] = useState('');
-    const [address, setAddress] = useState('');
-    const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
-    const [imageUrls, setImageUrls] = useState<string[]>([]);
-
-    // Room details state
-    const [rooms, setRooms] = useState([{
-        type: 'Standard',
+    const [formData, setFormData] = useState<FormData>({
+        name: '',
         description: '',
-        pricePerNight: 0,
-        maxGuests: 2,
-        amenities: [] as string[],
-        images: [] as string[]
-    }]);
-
-    // UI state
+        location: {
+            city: '',
+            country: '',
+            address: ''
+        },
+        image: '',
+        rating: 0,
+        amenities: []
+    });
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<string | null>(null);
-    const [transactionHash, setTransactionHash] = useState<string | null>(null);
+    const [error, setError] = useState('');
+    const [message, setMessage] = useState('');
 
-    useEffect(() => {
-        // Redirect if not logged in or not a hotel owner
-        if (!user && !isHotelOwner) {
-            router.push('/');
-        }
-    }, [user, isHotelOwner, router]);
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void => {
+        const { name, value } = e.target;
 
-    const handleAmenityToggle = (amenity: string) => {
-        if (selectedAmenities.includes(amenity)) {
-            setSelectedAmenities(selectedAmenities.filter(a => a !== amenity));
-        } else {
-            setSelectedAmenities([...selectedAmenities, amenity]);
-        }
-    };
-
-    const handleRoomAmenityToggle = (index: number, amenity: string) => {
-        const newRooms = [...rooms];
-        if (newRooms[index].amenities.includes(amenity)) {
-            newRooms[index].amenities = newRooms[index].amenities.filter(a => a !== amenity);
-        } else {
-            newRooms[index].amenities = [...newRooms[index].amenities, amenity];
-        }
-        setRooms(newRooms);
-    };
-
-    const addRoom = () => {
-        setRooms([...rooms, {
-            type: 'Standard',
-            description: '',
-            pricePerNight: 0,
-            maxGuests: 2,
-            amenities: [],
-            images: []
-        }]);
-    };
-
-    const removeRoom = (index: number) => {
-        if (rooms.length > 1) {
-            setRooms(rooms.filter((_, i) => i !== index));
-        }
-    };
-
-    const handleRoomChange = (index: number, field: string, value: any) => {
-        const newRooms = [...rooms];
-        newRooms[index] = { ...newRooms[index], [field]: value };
-        setRooms(newRooms);
-    };
-
-    const handleRoomImageUpload = (index: number, urls: string[]) => {
-        const newRooms = [...rooms];
-        newRooms[index].images = [...newRooms[index].images, ...urls];
-        setRooms(newRooms);
-    };
-
-    const registerHotelOnBlockchain = async () => {
-        if (!provider || !account) {
-            setError('Wallet not connected');
-            return null;
-        }
-
-        try {
-            const signer = provider.getSigner();
-            const contract = getContract(
-                config.HOTEL_BOOKING_CONTRACT,
-                HotelBookingABI.abi,
-                signer
-            );
-
-            // Register hotel on blockchain
-            const tx = await contract.addHotel(
-                hotelName,
-                `${city}, ${country}`,
-                description,
-                imageUrls.length > 0 ? imageUrls[0] : ''
-            );
-
-            await tx.wait();
-
-            return {
-                transactionHash: tx.hash,
-                hotelId: (await contract.hotelIdCounter()).sub(1).toString()
-            };
-        } catch (error: any) {
-            console.error('Error registering hotel on blockchain:', error);
-            setError(`Blockchain error: ${error.message || 'Unknown error'}`);
-            return null;
-        }
-    };
-
-    const saveHotelToBackend = async (blockchainId: string, blockchainTxHash: string) => {
-        if (!user) {
-            setError('User not authenticated');
-            return false;
-        }
-
-        try {
-            // Prepare hotel data
-            const hotelData = {
-                name: hotelName,
-                description,
-                location: {
-                    city,
-                    country,
-                    address,
-                    coordinates: {
-                        lat: 0, // Would need to integrate with a geocoding service
-                        lng: 0
+        if (name.includes('.')) {
+            // Handle nested properties like location.city
+            const [parent, child] = name.split('.');
+            if (parent === 'location') {
+                setFormData({
+                    ...formData,
+                    location: {
+                        ...formData.location,
+                        [child]: value
                     }
-                },
-                image: imageUrls.length > 0 ? imageUrls[0] : '',
-                images: imageUrls,
-                rating: 0,
-                amenities: selectedAmenities,
-                rooms: rooms.map(room => ({
-                    type: room.type,
-                    description: room.description,
-                    pricePerNight: room.pricePerNight,
-                    maxGuests: room.maxGuests,
-                    amenities: room.amenities,
-                    images: room.images,
-                    bookings: []
-                })),
-                ownerId: user.uid,
-                blockchainId: blockchainId,
-                blockchainTxHash
-            };
-
-            // Save to backend
-            const response = await axios.post(`${config.API_URL}/api/hotels`, hotelData);
-            return true;
-        } catch (error: any) {
-            console.error('Error saving hotel to backend:', error);
-            setError(`Backend error: ${error.message || 'Unknown error'}`);
-            return false;
+                });
+            }
+        } else {
+            setFormData({
+                ...formData,
+                [name]: value
+            });
         }
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleAmenityChange = (amenity: string): void => {
+        if (formData.amenities.includes(amenity)) {
+            setFormData({
+                ...formData,
+                amenities: formData.amenities.filter(a => a !== amenity)
+            });
+        } else {
+            setFormData({
+                ...formData,
+                amenities: [...formData.amenities, amenity]
+            });
+        }
+    };
+
+    const handleSubmit = async (e: React.FormEvent): Promise<void> => {
         e.preventDefault();
         setIsSubmitting(true);
-        setError(null);
-        setSuccess(null);
+        setError('');
+        setMessage('');
+
+        if (!user) {
+            setError('You must be logged in to register a hotel');
+            setIsSubmitting(false);
+            return;
+        }
 
         try {
-            // Validate form
-            if (!hotelName || !description || !city || !country || !address) {
-                setError('Please fill in all required fields');
-                setIsSubmitting(false);
-                return;
-            }
+            const hotelData = {
+                name: formData.name,
+                description: formData.description,
+                location: formData.location,
+                image: formData.image,
+                rating: Number(formData.rating),
+                amenities: formData.amenities,
+                ownerId: user.uid
+            };
 
-            if (imageUrls.length === 0) {
-                setError('Please upload at least one hotel image');
-                setIsSubmitting(false);
-                return;
-            }
+            const response = await axios.post(`${config.API_URL}/api/hotels`, hotelData);
 
-            if (selectedAmenities.length === 0) {
-                setError('Please select at least one amenity');
-                setIsSubmitting(false);
-                return;
-            }
-
-            // Validate rooms
-            for (const room of rooms) {
-                if (!room.type || room.pricePerNight <= 0 || room.maxGuests <= 0) {
-                    setError('Please fill in all room details correctly');
-                    setIsSubmitting(false);
-                    return;
-                }
-            }
-
-            // Step 1: Register hotel on blockchain
-            const blockchainResult = await registerHotelOnBlockchain();
-            if (!blockchainResult) {
-                setIsSubmitting(false);
-                return;
-            }
-
-            setTransactionHash(blockchainResult.transactionHash);
-
-            // Step 2: Save hotel details to backend
-            const backendResult = await saveHotelToBackend(blockchainResult.hotelId, blockchainResult.transactionHash);
-            if (!backendResult) {
-                setIsSubmitting(false);
-                return;
-            }
-
-            // Success
-            setSuccess(`Hotel "${hotelName}" has been successfully registered!`);
-
-            // Reset form after successful submission
-            setTimeout(() => {
-                router.push('/owner');
-            }, 3000);
-
-        } catch (error: any) {
-            console.error('Error registering hotel:', error);
-            setError(`Registration error: ${error.message || 'Unknown error'}`);
+            setMessage('Hotel registered successfully!');
+            router.push('/owner');
+        } catch (err: any) {
+            console.error('Error registering hotel:', err);
+            setError(err.response?.data?.message || 'Failed to register hotel. Please try again.');
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    if (!isHotelOwner) {
+    // Redirect if not logged in or not a hotel owner
+    if (!loading && (!user || !isHotelOwner)) {
         return (
             <Layout>
                 <div className="container mx-auto px-4 py-8">
-                    <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6">
-                        <h2 className="text-xl font-bold mb-4">🔍 Hotel Owner Access Required</h2>
-                        <div className="space-y-2">
-                            <p><strong>User Email:</strong> {user?.email || 'Not signed in'}</p>
-                            <p><strong>Authentication Status:</strong> {user ? '✅ Signed in' : '❌ Not signed in'}</p>
-                            <p><strong>Is Hotel Owner:</strong> {isHotelOwner ? '✅ Yes' : '❌ No'}</p>
-                        </div>
+                    <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4">
+                        <p className="font-bold">Access Denied</p>
+                        <p>You need hotel owner privileges to access this page.</p>
                         <div className="mt-4">
-                            <p>You need hotel owner privileges to access this page. Please contact the administrator.</p>
+                            <button
+                                onClick={() => router.push('/')}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            >
+                                Go to Home
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -297,311 +149,168 @@ export default function RegisterHotel() {
         <Layout>
             <div className="min-h-screen bg-[#0B1120]">
                 <div className="container mx-auto px-6 py-8">
-                    <h1 className="text-3xl font-bold mb-8">Register New Hotel</h1>
-
-                    {!account && !user && (
-                        <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6 rounded">
-                            <h2 className="font-bold">Connect Your Wallet</h2>
-                            <p>Please connect your wallet to register a hotel.</p>
-                        </div>
-                    )}
+                    <div className="flex justify-between items-center mb-8">
+                        <h1 className="text-3xl font-bold text-white">Register New Hotel</h1>
+                        <Link href="/owner" className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors">
+                            Back to Dashboard
+                        </Link>
+                    </div>
 
                     {error && (
-                        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded">
-                            <h2 className="font-bold">Error</h2>
+                        <div className="bg-red-900/30 border border-red-500 text-red-300 p-4 mb-6 rounded-lg">
                             <p>{error}</p>
                         </div>
                     )}
 
-                    {success && (
-                        <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6 rounded">
-                            <h2 className="font-bold">Success!</h2>
-                            <p>{success}</p>
-                            {transactionHash && (
-                                <p className="mt-2">
-                                    Transaction Hash:{' '}
-                                    <a
-                                        href={`https://sepolia.etherscan.io/tx/${transactionHash}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-blue-600 hover:underline"
-                                    >
-                                        {transactionHash.slice(0, 10)}...{transactionHash.slice(-8)}
-                                    </a>
-                                </p>
-                            )}
-                        </div>
-                    )}
-
-                    <form onSubmit={handleSubmit} className="space-y-8">
-                        {/* Hotel Details Section */}
-                        <div className="bg-[#1E293B] rounded-xl p-6">
-                            <h2 className="text-2xl font-semibold mb-6">Hotel Details</h2>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <form onSubmit={handleSubmit} className="bg-gray-800 shadow-xl rounded-xl overflow-hidden border border-gray-700 p-6 mb-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-6">
                                 <div>
-                                    <label className="block text-sm font-medium mb-2">Hotel Name *</label>
+                                    <label htmlFor="name" className="block text-gray-300 mb-2">Hotel Name</label>
                                     <input
                                         type="text"
-                                        className="w-full px-4 py-2 border rounded-lg bg-[#0B1120] border-gray-700"
+                                        id="name"
+                                        name="name"
+                                        value={formData.name}
+                                        onChange={handleChange}
+                                        required
+                                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         placeholder="Enter hotel name"
-                                        value={hotelName}
-                                        onChange={(e) => setHotelName(e.target.value)}
-                                        required
                                     />
                                 </div>
 
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium mb-2">Description *</label>
+                                <div>
+                                    <label htmlFor="description" className="block text-gray-300 mb-2">Description</label>
                                     <textarea
-                                        className="w-full px-4 py-2 border rounded-lg bg-[#0B1120] border-gray-700"
+                                        id="description"
+                                        name="description"
+                                        value={formData.description}
+                                        onChange={handleChange}
+                                        required
+                                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-32"
                                         placeholder="Enter hotel description"
-                                        value={description}
-                                        onChange={(e) => setDescription(e.target.value)}
-                                        rows={4}
-                                        required
-                                    />
+                                    ></textarea>
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium mb-2">City *</label>
+                                    <label htmlFor="city" className="block text-gray-300 mb-2">City</label>
                                     <input
                                         type="text"
-                                        className="w-full px-4 py-2 border rounded-lg bg-[#0B1120] border-gray-700"
+                                        id="city"
+                                        name="location.city"
+                                        value={formData.location.city}
+                                        onChange={handleChange}
+                                        required
+                                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         placeholder="Enter city"
-                                        value={city}
-                                        onChange={(e) => setCity(e.target.value)}
-                                        required
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium mb-2">Country *</label>
+                                    <label htmlFor="country" className="block text-gray-300 mb-2">Country</label>
                                     <input
                                         type="text"
-                                        className="w-full px-4 py-2 border rounded-lg bg-[#0B1120] border-gray-700"
+                                        id="country"
+                                        name="location.country"
+                                        value={formData.location.country}
+                                        onChange={handleChange}
+                                        required
+                                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         placeholder="Enter country"
-                                        value={country}
-                                        onChange={(e) => setCountry(e.target.value)}
-                                        required
                                     />
                                 </div>
+                            </div>
 
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium mb-2">Address *</label>
+                            <div className="space-y-6">
+                                <div>
+                                    <label htmlFor="address" className="block text-gray-300 mb-2">Address</label>
                                     <input
                                         type="text"
-                                        className="w-full px-4 py-2 border rounded-lg bg-[#0B1120] border-gray-700"
-                                        placeholder="Enter full address"
-                                        value={address}
-                                        onChange={(e) => setAddress(e.target.value)}
+                                        id="address"
+                                        name="location.address"
+                                        value={formData.location.address}
+                                        onChange={handleChange}
                                         required
+                                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="Enter address"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label htmlFor="rating" className="block text-gray-300 mb-2">Rating (0-10)</label>
+                                    <input
+                                        type="number"
+                                        id="rating"
+                                        name="rating"
+                                        value={formData.rating}
+                                        onChange={handleChange}
+                                        min="0"
+                                        max="10"
+                                        step="0.1"
+                                        required
+                                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-gray-300 mb-2">Amenities</label>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                        {standardAmenities.map((amenity) => (
+                                            <div key={amenity} className="flex items-center">
+                                                <input
+                                                    type="checkbox"
+                                                    id={`amenity-${amenity}`}
+                                                    name="amenities"
+                                                    value={amenity}
+                                                    checked={formData.amenities.includes(amenity)}
+                                                    onChange={() => handleAmenityChange(amenity)}
+                                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-600 rounded bg-gray-700"
+                                                />
+                                                <label htmlFor={`amenity-${amenity}`} className="ml-2 text-gray-300">
+                                                    {amenity}
+                                                </label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label htmlFor="image" className="block text-gray-300 mb-2">Image URL</label>
+                                    <input
+                                        type="text"
+                                        id="image"
+                                        name="image"
+                                        value={formData.image}
+                                        onChange={handleChange}
+                                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="Enter image URL (optional)"
                                     />
                                 </div>
                             </div>
-
-                            {/* Amenities */}
-                            <div className="mt-6">
-                                <label className="block text-sm font-medium mb-2">Amenities *</label>
-                                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                    {standardAmenities.map((amenity) => (
-                                        <div
-                                            key={amenity}
-                                            className={`px-4 py-2 rounded-lg cursor-pointer text-center text-sm transition-colors
-                        ${selectedAmenities.includes(amenity)
-                                                    ? 'bg-blue-600 text-white'
-                                                    : 'bg-[#0B1120] text-gray-300 hover:bg-gray-700'}`}
-                                            onClick={() => handleAmenityToggle(amenity)}
-                                        >
-                                            {amenity}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Image Upload */}
-                            <div className="mt-6">
-                                <EnhancedIPFSUploader
-                                    onUploadComplete={(urls: string[]) => setImageUrls([...imageUrls, ...urls])}
-                                    uploadType="hotel-image"
-                                />
-
-                                {imageUrls.length > 0 && (
-                                    <div className="mt-4">
-                                        <label className="block text-sm font-medium mb-2">Uploaded Images</label>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                            {imageUrls.map((url, index) => (
-                                                <div key={index} className="relative">
-                                                    <img
-                                                        src={url}
-                                                        alt={`Hotel image ${index + 1}`}
-                                                        className="h-32 w-full object-cover rounded-lg"
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 text-xs"
-                                                        onClick={() => setImageUrls(imageUrls.filter((_, i) => i !== index))}
-                                                    >
-                                                        ✕
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
                         </div>
 
-                        {/* Rooms Section */}
-                        <div className="bg-[#1E293B] rounded-xl p-6">
-                            <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-2xl font-semibold">Room Details</h2>
-                                <button
-                                    type="button"
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                                    onClick={addRoom}
-                                >
-                                    Add Room
-                                </button>
-                            </div>
-
-                            {rooms.map((room, index) => (
-                                <div key={index} className="mb-8 border border-gray-700 rounded-lg p-4">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="text-xl font-semibold">Room {index + 1}</h3>
-                                        {rooms.length > 1 && (
-                                            <button
-                                                type="button"
-                                                className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
-                                                onClick={() => removeRoom(index)}
-                                            >
-                                                Remove
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div>
-                                            <label className="block text-sm font-medium mb-2">Room Type *</label>
-                                            <select
-                                                className="w-full px-4 py-2 border rounded-lg bg-[#0B1120] border-gray-700"
-                                                value={room.type}
-                                                onChange={(e) => handleRoomChange(index, 'type', e.target.value)}
-                                                required
-                                            >
-                                                {roomTypes.map((type) => (
-                                                    <option key={type} value={type}>{type}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-sm font-medium mb-2">Price Per Night (USDT) *</label>
-                                            <input
-                                                type="number"
-                                                className="w-full px-4 py-2 border rounded-lg bg-[#0B1120] border-gray-700"
-                                                placeholder="Enter price"
-                                                value={room.pricePerNight}
-                                                onChange={(e) => handleRoomChange(index, 'pricePerNight', Number(e.target.value))}
-                                                min="0"
-                                                step="0.01"
-                                                required
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-sm font-medium mb-2">Max Guests *</label>
-                                            <input
-                                                type="number"
-                                                className="w-full px-4 py-2 border rounded-lg bg-[#0B1120] border-gray-700"
-                                                placeholder="Enter max guests"
-                                                value={room.maxGuests}
-                                                onChange={(e) => handleRoomChange(index, 'maxGuests', Number(e.target.value))}
-                                                min="1"
-                                                required
-                                            />
-                                        </div>
-
-                                        <div className="md:col-span-2">
-                                            <label className="block text-sm font-medium mb-2">Room Description</label>
-                                            <textarea
-                                                className="w-full px-4 py-2 border rounded-lg bg-[#0B1120] border-gray-700"
-                                                placeholder="Enter room description"
-                                                value={room.description}
-                                                onChange={(e) => handleRoomChange(index, 'description', e.target.value)}
-                                                rows={2}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Room Amenities */}
-                                    <div className="mt-4">
-                                        <label className="block text-sm font-medium mb-2">Room Amenities</label>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                                            {standardAmenities.map((amenity) => (
-                                                <div
-                                                    key={amenity}
-                                                    className={`px-3 py-1 rounded-lg cursor-pointer text-center text-xs transition-colors
-                            ${room.amenities.includes(amenity)
-                                                            ? 'bg-blue-600 text-white'
-                                                            : 'bg-[#0B1120] text-gray-300 hover:bg-gray-700'}`}
-                                                    onClick={() => handleRoomAmenityToggle(index, amenity)}
-                                                >
-                                                    {amenity}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Room Images */}
-                                    <div className="mt-4">
-                                        <EnhancedIPFSUploader
-                                            onUploadComplete={(urls: string[]) => handleRoomImageUpload(index, urls)}
-                                            uploadType="room-image"
-                                            metadata={{ roomType: room.type }}
-                                        />
-
-                                        {room.images.length > 0 && (
-                                            <div className="mt-4">
-                                                <label className="block text-sm font-medium mb-2">Room Images</label>
-                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                                    {room.images.map((url, imgIndex) => (
-                                                        <div key={imgIndex} className="relative">
-                                                            <img
-                                                                src={url}
-                                                                alt={`Room image ${imgIndex + 1}`}
-                                                                className="h-24 w-full object-cover rounded-lg"
-                                                            />
-                                                            <button
-                                                                type="button"
-                                                                className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 text-xs"
-                                                                onClick={() => {
-                                                                    const newRooms = [...rooms];
-                                                                    newRooms[index].images = newRooms[index].images.filter((_, i) => i !== imgIndex);
-                                                                    setRooms(newRooms);
-                                                                }}
-                                                            >
-                                                                ✕
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Submit Button */}
-                        <div className="flex justify-end">
+                        <div className="flex justify-end mt-8 space-x-4">
+                            <Link href="/owner" className="px-6 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors">
+                                Cancel
+                            </Link>
                             <button
                                 type="submit"
-                                className={`px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-lg ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
-                                    }`}
                                 disabled={isSubmitting}
+                                className={`px-6 py-3 ${isSubmitting ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-lg transition-colors flex items-center`}
                             >
-                                {isSubmitting ? 'Registering...' : 'Register Hotel'}
+                                {isSubmitting ? (
+                                    <>
+                                        <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Registering...
+                                    </>
+                                ) : (
+                                    <>
+                                        Register Hotel
+                                    </>
+                                )}
                             </button>
                         </div>
                     </form>

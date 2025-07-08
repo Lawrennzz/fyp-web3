@@ -22,6 +22,7 @@ import {
   IoServerOutline
 } from 'react-icons/io5';
 import { FaSwimmingPool, FaSpa, FaPaw } from 'react-icons/fa';
+import { normalizeImageUrl, PLACEHOLDER_HOTEL_IMAGE } from '../../utils/helpers';
 
 interface Room {
   _id: string;
@@ -315,13 +316,15 @@ export default function HotelDetail({ initialHotel }: HotelDetailProps) {
 
                 {/* Main Hotel Image */}
                 <div className="relative h-[400px] w-full rounded-xl overflow-hidden mb-6">
-                  <Image
-                    src={typeof hotel.images[0] === 'string' ? hotel.images[0] : hotel.images[0]?.url || '/images/placeholder.jpg'}
+                  <img
+                    className="w-full h-full object-cover rounded-lg"
+                    src={normalizeImageUrl(hotel.images[0]?.url || hotel.image)}
                     alt={hotel.name}
-                    fill
-                    sizes="(max-width: 768px) 100vw, 66vw"
-                    className="object-cover"
-                    priority
+                    onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                      const target = e.target as HTMLImageElement;
+                      target.onerror = null;
+                      target.src = PLACEHOLDER_HOTEL_IMAGE;
+                    }}
                   />
                 </div>
 

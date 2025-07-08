@@ -11,6 +11,9 @@ const seedDatabase = async () => {
     await Hotel.deleteMany({});
     console.log('Cleared existing hotels');
 
+    // Owner ID to use for all hotels
+    const ownerId = "1ZN9NxYGozUbFAudlXoyloyfnhL2";
+
     const hotels = [
       {
         name: "The Ritz-Carlton",
@@ -26,9 +29,9 @@ const seedDatabase = async () => {
         },
         image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80",
         images: [
-          "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80",
-          "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80",
-          "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=800&q=80"
+          { url: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80", alt: "Hotel Front" },
+          { url: "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80", alt: "Hotel Lobby" },
+          { url: "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=800&q=80", alt: "Hotel Pool" }
         ],
         rating: 9.5,
         amenities: ["WiFi", "Pool", "Spa & Wellness", "Restaurant", "Bar", "Parking"],
@@ -40,8 +43,8 @@ const seedDatabase = async () => {
             maxGuests: 2,
             amenities: ["WiFi", "Room Service", "Mini Bar", "Smart TV"],
             images: [
-              "https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=800&q=80",
-              "https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=800&q=80"
+              { url: "https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=800&q=80", alt: "Deluxe Room" },
+              { url: "https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=800&q=80", alt: "Deluxe Bathroom" }
             ]
           },
           {
@@ -51,11 +54,12 @@ const seedDatabase = async () => {
             maxGuests: 2,
             amenities: ["WiFi", "Room Service", "Mini Bar", "Smart TV", "Lounge Access"],
             images: [
-              "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80",
-              "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80"
+              { url: "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80", alt: "Executive Suite" },
+              { url: "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80", alt: "Suite Living Area" }
             ]
           }
-        ]
+        ],
+        ownerId: ownerId
       },
       {
         name: "Mandarin Oriental",
@@ -71,8 +75,8 @@ const seedDatabase = async () => {
         },
         image: "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80",
         images: [
-          "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80",
-          "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=800&q=80"
+          { url: "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80", alt: "Hotel Exterior" },
+          { url: "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=800&q=80", alt: "Hotel Interior" }
         ],
         rating: 9.3,
         amenities: ["WiFi", "Pool", "Spa & Wellness", "Restaurant", "Bar", "Gym"],
@@ -84,8 +88,8 @@ const seedDatabase = async () => {
             maxGuests: 2,
             amenities: ["WiFi", "Room Service", "Mini Bar", "Smart TV"],
             images: [
-              "https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=800&q=80",
-              "https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=800&q=80"
+              { url: "https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=800&q=80", alt: "Deluxe Room" },
+              { url: "https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=800&q=80", alt: "Deluxe Bathroom" }
             ]
           },
           {
@@ -95,11 +99,12 @@ const seedDatabase = async () => {
             maxGuests: 3,
             amenities: ["WiFi", "Room Service", "Mini Bar", "Smart TV", "Lounge Access", "Butler Service"],
             images: [
-              "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80",
-              "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80"
+              { url: "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80", alt: "Premier Suite" },
+              { url: "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80", alt: "Suite Living Area" }
             ]
           }
-        ]
+        ],
+        ownerId: ownerId
       },
       {
         name: "Le Royal Monceau",
@@ -115,8 +120,8 @@ const seedDatabase = async () => {
         },
         image: "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=800&q=80",
         images: [
-          "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=800&q=80",
-          "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80"
+          { url: "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=800&q=80", alt: "Hotel Exterior" },
+          { url: "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80", alt: "Hotel Interior" }
         ],
         rating: 9.4,
         amenities: ["WiFi", "Pool", "Spa & Wellness", "Restaurant", "Bar", "Art Gallery"],
@@ -128,8 +133,8 @@ const seedDatabase = async () => {
             maxGuests: 2,
             amenities: ["WiFi", "Room Service", "Mini Bar", "Smart TV", "Art Books"],
             images: [
-              "https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=800&q=80",
-              "https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=800&q=80"
+              { url: "https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=800&q=80", alt: "Studio Room" },
+              { url: "https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=800&q=80", alt: "Studio Bathroom" }
             ]
           },
           {
@@ -139,16 +144,55 @@ const seedDatabase = async () => {
             maxGuests: 3,
             amenities: ["WiFi", "Room Service", "Mini Bar", "Smart TV", "Private Terrace"],
             images: [
-              "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80",
-              "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80"
+              { url: "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80", alt: "Signature Suite" },
+              { url: "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80", alt: "Suite Living Area" }
             ]
           }
-        ]
+        ],
+        ownerId: ownerId
+      },
+      {
+        name: "Sample Owner Hotel",
+        description: "This is a sample hotel for testing owner functionality",
+        location: {
+          city: "Singapore",
+          country: "Singapore",
+          address: "123 Test Street"
+        },
+        image: "https://placehold.co/800x600/e0e0e0/808080?text=Sample+Owner+Hotel",
+        images: [
+          { url: "https://placehold.co/800x600/e0e0e0/808080?text=Sample+Owner+Hotel", alt: "Hotel Front" }
+        ],
+        rating: 4.5,
+        amenities: ["WiFi", "Pool", "Restaurant"],
+        rooms: [
+          {
+            type: "Standard",
+            description: "A comfortable standard room",
+            pricePerNight: 100,
+            maxGuests: 2,
+            amenities: ["TV", "Air conditioning"],
+            images: [
+              { url: "https://placehold.co/800x600/e0e0e0/808080?text=Standard+Room", alt: "Standard Room" }
+            ]
+          },
+          {
+            type: "Deluxe",
+            description: "A spacious deluxe room",
+            pricePerNight: 200,
+            maxGuests: 4,
+            amenities: ["TV", "Air conditioning", "Mini bar"],
+            images: [
+              { url: "https://placehold.co/800x600/e0e0e0/808080?text=Deluxe+Room", alt: "Deluxe Room" }
+            ]
+          }
+        ],
+        ownerId: ownerId
       }
     ];
 
     await Hotel.insertMany(hotels);
-    console.log('Successfully seeded 3 hotels');
+    console.log(`Successfully seeded ${hotels.length} hotels`);
 
     await mongoose.connection.close();
     console.log('Database connection closed');

@@ -26,9 +26,21 @@ const nextConfig = {
         hostname: '*.googleusercontent.com',
         port: '',
         pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'placehold.co',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'ipfs.io',
+        port: '',
+        pathname: '/**',
       }
     ],
-    domains: ['firebasestorage.googleapis.com', 'images.unsplash.com', 'localhost'],
+    domains: ['firebasestorage.googleapis.com', 'images.unsplash.com', 'localhost', 'placehold.co', 'ipfs.io'],
   },
   // Add hostname configuration for development
   webpack: (config, { isServer }) => {

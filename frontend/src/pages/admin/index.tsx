@@ -4,7 +4,7 @@ import Layout from '../../components/Layout';
 import { useWeb3React } from '@web3-react/core';
 import { getContract } from '../../utils/web3Config';
 import { useAuth } from '../../contexts/FirebaseContext';
-import { IoWallet, IoDocumentText, IoRefresh, IoWarning, IoAdd } from 'react-icons/io5';
+import { IoWallet, IoDocumentText, IoRefresh, IoWarning, IoAdd, IoCode } from 'react-icons/io5';
 import { Contract, Event, BigNumber } from 'ethers';
 import HotelBookingABI from '../../contracts/HotelBooking.json';
 import { Web3Provider } from '@ethersproject/providers';
@@ -55,6 +55,16 @@ export default function AdminDashboard() {
     failedTransactions: 0
   });
   const [loading, setLoading] = useState(true);
+  const [showDebug, setShowDebug] = useState(false);
+
+  // Helper function to safely convert values to numbers
+  const getNumberValue = (value: any): number => {
+    if (value && typeof value.toNumber === 'function') {
+      return value.toNumber();
+    }
+    // If it's already a number or string, convert it
+    return Number(value);
+  };
 
   // Add debug logging
   useEffect(() => {
@@ -95,7 +105,10 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (isAdmin && !authLoading) {
+      // Always fetch Firebase bookings regardless of blockchain connectivity
       fetchFirebaseBookings();
+
+      // Fetch blockchain data if available
       if (account && library) {
         fetchTransactions();
         fetchDashboardStats();
@@ -110,16 +123,17 @@ export default function AdminDashboard() {
         const bookingFilter = contract.filters.BookingCreated();
 
         contract.on(bookingFilter, (bookingId, hotelId, roomId, guest, checkInDate, checkOutDate) => {
+          // Use the component-level getNumberValue function
           const newTx: Transaction = {
             id: bookingId.toString(),
             guestAddress: guest,
-            hotelId: hotelId.toNumber(),
-            roomId: roomId.toNumber(),
-            checkInDate: new Date(checkInDate.toNumber() * 1000),
-            checkOutDate: new Date(checkOutDate.toNumber() * 1000),
+            hotelId: getNumberValue(hotelId),
+            roomId: getNumberValue(roomId),
+            checkInDate: new Date(getNumberValue(checkInDate) * 1000),
+            checkOutDate: new Date(getNumberValue(checkOutDate) * 1000),
             status: 'completed',
             type: 'payment',
-            bookingId: bookingId.toNumber()
+            bookingId: getNumberValue(bookingId)
           };
           setTransactions(prev => [...prev, newTx]);
           fetchDashboardStats();
@@ -128,6 +142,10 @@ export default function AdminDashboard() {
         return () => {
           contract.removeAllListeners();
         };
+      } else {
+        console.log('💡 No blockchain connection, displaying only Firebase data');
+        // Set loading to false since we won't be fetching blockchain data
+        setLoading(false);
       }
     }
   }, [account, library, isAdmin, authLoading]);
@@ -154,9 +172,34 @@ export default function AdminDashboard() {
       console.log('🎯 Bookings for target address:', targetBookings);
 
       setFirebaseBookings(bookingsData);
+
+      // Update stats based on Firebase bookings
+      updateStatsWithFirebaseData(bookingsData);
     } catch (error) {
       console.error('❌ Error fetching Firebase bookings:', error);
     }
+  };
+
+  // New function to update stats with Firebase data
+  const updateStatsWithFirebaseData = (bookings: any[]) => {
+    if (!bookings || bookings.length === 0) return;
+
+    // Calculate total revenue from Firebase bookings
+    const totalFirebaseRevenue = bookings.reduce((sum, booking) => {
+      // Use totalPrice if available, otherwise use price
+      const bookingPrice = booking.totalPrice || booking.price || 0;
+      return sum + (typeof bookingPrice === 'number' ? bookingPrice : parseFloat(bookingPrice) || 0);
+    }, 0);
+
+    console.log('💰 Total Firebase Revenue:', totalFirebaseRevenue);
+    console.log('🔢 Total Firebase Transactions:', bookings.length);
+
+    // Update stats with Firebase data
+    setStats(prevStats => ({
+      ...prevStats,
+      totalTransactions: prevStats.totalTransactions + bookings.length,
+      totalRevenue: prevStats.totalRevenue + totalFirebaseRevenue
+    }));
   };
 
   const fetchTransactions = async () => {
@@ -183,13 +226,13 @@ export default function AdminDashboard() {
         return {
           id: args.bookingId.toString(),
           guestAddress: args.guest,
-          hotelId: args.hotelId.toNumber(),
-          roomId: args.roomId.toNumber(),
-          checkInDate: new Date(args.checkInDate.toNumber() * 1000),
-          checkOutDate: new Date(args.checkOutDate.toNumber() * 1000),
+          hotelId: getNumberValue(args.hotelId),
+          roomId: getNumberValue(args.roomId),
+          checkInDate: new Date(getNumberValue(args.checkInDate) * 1000),
+          checkOutDate: new Date(getNumberValue(args.checkOutDate) * 1000),
           status: 'completed' as const,
           type: 'payment' as const,
-          bookingId: args.bookingId.toNumber()
+          bookingId: getNumberValue(args.bookingId)
         };
       });
 
@@ -202,7 +245,18 @@ export default function AdminDashboard() {
 
   const fetchDashboardStats = async () => {
     try {
-      if (!library) return;
+      // Initialize stats with zeros
+      setStats({
+        totalTransactions: 0,
+        totalRevenue: 0,
+        pendingRefunds: 0,
+        failedTransactions: 0
+      });
+
+      if (!library) {
+        // If blockchain is not available, we can still show Firebase data
+        return;
+      }
 
       const contract = getContract(
         config.HOTEL_BOOKING_CONTRACT,
@@ -216,14 +270,16 @@ export default function AdminDashboard() {
       const pendingRefunds = await contract.getPendingRefunds();
       const failedTx = await contract.getFailedTransactions();
 
+      // Update with blockchain data
       setStats({
-        totalTransactions: totalTx.toNumber(),
+        totalTransactions: getNumberValue(totalTx),
         totalRevenue: parseFloat(ethers.utils.formatUnits(revenue, 18)),
-        pendingRefunds: pendingRefunds.toNumber(),
-        failedTransactions: failedTx.toNumber()
+        pendingRefunds: getNumberValue(pendingRefunds),
+        failedTransactions: getNumberValue(failedTx)
       });
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      console.error('Error fetching blockchain stats:', error);
+      // If there's an error with blockchain, we can still show Firebase data
     } finally {
       setLoading(false);
     }
@@ -246,6 +302,16 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Error processing refund:', error);
     }
+  };
+
+  // Format currency for display
+  const formatCurrency = (amount: number): string => {
+    return amount.toLocaleString('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
   };
 
   // Show loading while auth is initializing
@@ -299,14 +365,65 @@ export default function AdminDashboard() {
 
             <div className="flex space-x-4">
               <button
+                onClick={() => setShowDebug(!showDebug)}
+                className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                <IoCode className="mr-2" />
+                {showDebug ? 'Hide Debug' : 'Show Debug'}
+              </button>
+              <button
                 onClick={() => router.push('/admin/register-hotel')}
                 className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 <IoAdd className="mr-2" />
                 Register New Hotel
               </button>
+              <button
+                onClick={() => router.push('/admin/set-hotel-owner')}
+                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                <IoAdd className="mr-2" />
+                Set Hotel Owner
+              </button>
             </div>
           </div>
+
+          {/* Debug Information */}
+          {showDebug && (
+            <div className="mb-8 bg-gray-800/50 p-4 rounded-lg">
+              <h3 className="text-lg font-bold mb-2 text-gray-200">Debug Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-semibold text-gray-300 mb-2">Stats</h4>
+                  <pre className="bg-gray-900 text-green-400 p-4 rounded overflow-auto text-sm">
+                    {JSON.stringify(stats, null, 2)}
+                  </pre>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-300 mb-2">Firebase Bookings ({firebaseBookings.length})</h4>
+                  <pre className="bg-gray-900 text-green-400 p-4 rounded overflow-auto text-sm max-h-60">
+                    {JSON.stringify(firebaseBookings.map(b => ({
+                      id: b.id,
+                      price: b.totalPrice || b.price,
+                      hotel: b.hotelName,
+                      date: b.createdAt?.toDate?.() || b.createdAt
+                    })), null, 2)}
+                  </pre>
+                </div>
+              </div>
+              <div className="mt-4">
+                <button
+                  onClick={() => {
+                    fetchFirebaseBookings();
+                    fetchDashboardStats();
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Refresh Data
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -323,7 +440,7 @@ export default function AdminDashboard() {
                 <IoDocumentText className="text-2xl mr-2" />
                 <h3 className="text-lg">Total Revenue</h3>
               </div>
-              <p className="text-2xl font-bold">${stats.totalRevenue}</p>
+              <p className="text-2xl font-bold">{formatCurrency(stats.totalRevenue)}</p>
             </div>
 
             <div className="bg-yellow-500 text-white rounded-lg p-6">
@@ -391,8 +508,8 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                           <span className={`px-2 py-1 rounded-full text-xs ${booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                              booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-gray-100 text-gray-800'
+                            booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-gray-100 text-gray-800'
                             }`}>
                             {booking.status || 'unknown'}
                           </span>
@@ -471,8 +588,8 @@ export default function AdminDashboard() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                         <span className={`px-2 py-1 rounded-full text-xs ${tx.status === 'completed' ? 'bg-green-100 text-green-800' :
-                            tx.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-red-100 text-red-800'
+                          tx.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
                           }`}>
                           {tx.status}
                         </span>

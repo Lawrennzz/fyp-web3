@@ -2,6 +2,53 @@
  * Helper functions for the application
  */
 
+// Constants for default images and placeholders
+export const PLACEHOLDER_HOTEL_IMAGE = "https://placehold.co/800x600/e0e0e0/808080?text=Hotel+Placeholder";
+
+/**
+ * Validates and normalizes an image URL
+ * Handles various URL formats including:
+ * - Full URLs (http/https)
+ * - IPFS/UML links
+ * - Relative paths
+ * - Data URLs (base64)
+ * Returns a valid image URL or the placeholder if invalid
+ */
+export const normalizeImageUrl = (imageUrl: string | undefined | null): string => {
+    console.log('Frontend normalizeImageUrl input:', imageUrl);
+
+    if (!imageUrl) {
+        console.log('Empty URL, returning placeholder:', PLACEHOLDER_HOTEL_IMAGE);
+        return PLACEHOLDER_HOTEL_IMAGE;
+    }
+
+    // If it's already a full URL (http/https) or data URL, return as is
+    if (imageUrl.startsWith('http://') ||
+        imageUrl.startsWith('https://') ||
+        imageUrl.startsWith('data:image/')) {
+        console.log('Full URL detected, returning as is');
+        return imageUrl;
+    }
+
+    // If it's an IPFS URL without protocol, add it
+    if (imageUrl.startsWith('ipfs://')) {
+        // Convert IPFS URL to gateway URL
+        const converted = imageUrl.replace('ipfs://', 'https://ipfs.io/ipfs/');
+        console.log('IPFS URL converted to:', converted);
+        return converted;
+    }
+
+    // If it's a relative path, ensure it starts with /
+    if (!imageUrl.startsWith('/')) {
+        const prefixed = `/${imageUrl}`;
+        console.log('Adding / prefix to relative path:', prefixed);
+        return prefixed;
+    }
+
+    console.log('URL unchanged:', imageUrl);
+    return imageUrl;
+};
+
 /**
  * Format a date string or timestamp to a readable format
  * @param dateInput Date string, timestamp, or Date object

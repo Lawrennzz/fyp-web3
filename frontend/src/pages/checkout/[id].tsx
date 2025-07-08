@@ -12,6 +12,7 @@ import TestUSDTABI from '../../contracts/TestUSDT.json';
 import { useFirebase } from '../../contexts/FirebaseContext';
 import { addDoc, collection, Timestamp } from 'firebase/firestore';
 import { config } from '../../config';
+import { normalizeImageUrl, PLACEHOLDER_HOTEL_IMAGE } from '../../utils/helpers';
 
 interface CheckoutProps { }
 
@@ -156,7 +157,7 @@ export default function Checkout({ }: CheckoutProps) {
         hotelDetails: {
           name: hotel.name,
           location: hotel.location,
-          image: typeof hotel.images[0] === 'string' ? hotel.images[0] : hotel.images[0]?.url
+          image: normalizeImageUrl(hotel.images[0]?.url || hotel.image)
         },
         roomDetails: {
           type: room.type,
@@ -277,10 +278,15 @@ export default function Checkout({ }: CheckoutProps) {
                 <div className="flex gap-6">
                   <div className="relative w-32 h-32 rounded-lg overflow-hidden">
                     <Image
-                      src={typeof hotel.images[0] === 'string' ? hotel.images[0] : hotel.images[0]?.url}
+                      src={normalizeImageUrl(hotel.images[0]?.url || hotel.image)}
                       alt={hotel.name}
                       fill
                       className="object-cover"
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null;
+                        target.src = PLACEHOLDER_HOTEL_IMAGE;
+                      }}
                     />
                   </div>
                   <div>

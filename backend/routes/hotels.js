@@ -4,6 +4,49 @@ const Hotel = require('../models/Hotel');
 const InvoiceGenerator = require('../utils/invoiceGenerator');
 const path = require('path');
 
+// Add a constant for the placeholder hotel image at the top of the file
+const PLACEHOLDER_HOTEL_IMAGE = "https://placehold.co/800x600/e0e0e0/808080?text=Hotel+Placeholder";
+
+/**
+ * Normalize image URL to ensure it's valid
+ * @param {string} imageUrl - The image URL to normalize
+ * @returns {string} - Normalized image URL
+ */
+const normalizeImageUrl = (imageUrl) => {
+  console.log('normalizeImageUrl input:', imageUrl);
+
+  if (!imageUrl) {
+    console.log('Empty URL, returning placeholder:', PLACEHOLDER_HOTEL_IMAGE);
+    return PLACEHOLDER_HOTEL_IMAGE;
+  }
+
+  // If it's already a full URL (http/https) or data URL, return as is
+  if (imageUrl.startsWith('http://') ||
+    imageUrl.startsWith('https://') ||
+    imageUrl.startsWith('data:image/')) {
+    console.log('Full URL detected, returning as is');
+    return imageUrl;
+  }
+
+  // If it's an IPFS URL without protocol, add it
+  if (imageUrl.startsWith('ipfs://')) {
+    // Convert IPFS URL to gateway URL
+    const converted = imageUrl.replace('ipfs://', 'https://ipfs.io/ipfs/');
+    console.log('IPFS URL converted to:', converted);
+    return converted;
+  }
+
+  // If it's a relative path, ensure it starts with /
+  if (!imageUrl.startsWith('/')) {
+    const prefixed = `/${imageUrl}`;
+    console.log('Adding / prefix to relative path:', prefixed);
+    return prefixed;
+  }
+
+  console.log('URL unchanged:', imageUrl);
+  return imageUrl;
+};
+
 // TEST ROUTE - Remove after debugging
 router.get('/test', (req, res) => {
   console.log('TEST ROUTE CALLED');
@@ -59,19 +102,22 @@ const validateRoomAmenities = (amenities) => {
 const transformHotelForFrontend = (hotel) => {
   if (!hotel) return null;
 
-  const hotelObj = hotel.toObject ? hotel.toObject() : { ...hotel };
+  const hotelObj = hotel.toObject ? hotel.toObject() : hotel;
 
-  // Transform hotel images
+  // Transform images to standard format
   const transformedImages = (hotelObj.images || []).map(image => {
     if (typeof image === 'string') {
-      return { url: image, alt: hotelObj.name };
+      return { url: normalizeImageUrl(image), alt: `${hotelObj.name} view` };
     }
-    return image;
+    return {
+      url: normalizeImageUrl(image.url),
+      alt: image.alt || `${hotelObj.name} view`
+    };
   });
 
   return {
     _id: hotelObj._id.toString(),
-    name: hotelObj.name || '',
+    name: hotelObj.name,
     location: {
       city: hotelObj.location?.city || '',
       country: hotelObj.location?.country || '',
@@ -79,7 +125,7 @@ const transformHotelForFrontend = (hotel) => {
       coordinates: hotelObj.location?.coordinates || null
     },
     rating: Math.min(5, Math.round((hotelObj.rating || 0) / 2)), // Convert 10-point scale to 5-point scale
-    image: transformedImages.length > 0 ? transformedImages[0].url : '/images/placeholder-hotel.jpg',
+    image: transformedImages.length > 0 ? transformedImages[0].url : PLACEHOLDER_HOTEL_IMAGE,
     images: transformedImages,
     description: hotelObj.description || '',
     amenities: hotelObj.amenities || [],

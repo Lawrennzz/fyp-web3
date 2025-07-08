@@ -7,14 +7,14 @@ import { getContract } from '../../utils/web3Config';
 import { ethers } from 'ethers';
 import { Web3Provider } from '@ethersproject/providers';
 import { IconType } from 'react-icons';
-import { 
-  IoStar, 
-  IoLocationOutline, 
-  IoWifiOutline, 
-  IoRestaurantOutline, 
-  IoCarOutline, 
-  IoCalendarOutline, 
-  IoPeopleOutline, 
+import {
+  IoStar,
+  IoLocationOutline,
+  IoWifiOutline,
+  IoRestaurantOutline,
+  IoCarOutline,
+  IoCalendarOutline,
+  IoPeopleOutline,
   IoSearchOutline,
   IoListOutline,
   IoMapOutline,
@@ -22,6 +22,7 @@ import {
 } from 'react-icons/io5';
 import { FaSwimmingPool, FaSpa, FaPaw } from 'react-icons/fa';
 import HotelMap from '../../components/HotelMap';
+import { normalizeImageUrl, PLACEHOLDER_HOTEL_IMAGE } from '../../utils/helpers';
 
 interface Room {
   type: string;
@@ -84,7 +85,7 @@ export default function Hotels() {
   const [filteredHotels, setFilteredHotels] = useState<Hotel[]>([]);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  
+
   const availableAmenities = [
     'WiFi',
     'Pool',
@@ -177,7 +178,7 @@ export default function Hotels() {
         ...router.query,
         ...searchParams
       };
-      
+
       // Only update if the query params have actually changed
       if (JSON.stringify(newQuery) !== JSON.stringify(router.query)) {
         router.push({
@@ -199,7 +200,7 @@ export default function Hotels() {
   useEffect(() => {
     if (!loading && hotels.length > 0) {
       let filtered = [...hotels];
-      
+
       // Filter by price range
       if (priceRange) {
         filtered = filtered.filter(hotel => {
@@ -211,7 +212,7 @@ export default function Hotels() {
       // Filter by location
       if (searchParams.location) {
         const searchLocation = searchParams.location.toLowerCase();
-        filtered = filtered.filter(hotel => 
+        filtered = filtered.filter(hotel =>
           hotel.location.city.toLowerCase().includes(searchLocation) ||
           hotel.location.country.toLowerCase().includes(searchLocation)
         );
@@ -219,8 +220,8 @@ export default function Hotels() {
 
       // Filter by amenities
       if (selectedAmenities.length > 0) {
-        filtered = filtered.filter(hotel => 
-          selectedAmenities.every(amenity => 
+        filtered = filtered.filter(hotel =>
+          selectedAmenities.every(amenity =>
             hotel.amenities.map(a => a.toLowerCase()).includes(amenity.toLowerCase())
           )
         );
@@ -230,7 +231,7 @@ export default function Hotels() {
       if (selectedStar !== null) {
         filtered = filtered.filter(hotel => Math.floor(hotel.rating / 2) === selectedStar);
       }
-      
+
       switch (sortBy) {
         case 'lowToHigh':
           filtered.sort((a, b) => {
@@ -250,7 +251,7 @@ export default function Hotels() {
           filtered.sort((a, b) => b.rating - a.rating);
           break;
       }
-      
+
       setFilteredHotels(filtered);
     }
   }, [hotels, priceRange, selectedStar, selectedAmenities, sortBy, searchParams.location, loading]);
@@ -259,12 +260,12 @@ export default function Hotels() {
     try {
       setLoading(true);
       setError(null);
-      
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hotels`);
       if (!response.ok) {
         throw new Error('Failed to fetch hotels');
       }
-      
+
       const data = await response.json();
       setHotels(data);
       setFilteredHotels(data); // Initialize filtered hotels with all hotels
@@ -322,33 +323,29 @@ export default function Hotels() {
         <div className="container mx-auto px-6 py-4 flex gap-4">
           <button
             onClick={() => setSortBy('relevant')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg ${
-              sortBy === 'relevant' ? 'bg-blue-500' : 'bg-[#1E293B]'
-            }`}
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg ${sortBy === 'relevant' ? 'bg-blue-500' : 'bg-[#1E293B]'
+              }`}
           >
             <StarIcon className="w-5 h-5" /> Most Relevant
           </button>
           <button
             onClick={() => setSortBy('lowToHigh')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg ${
-              sortBy === 'lowToHigh' ? 'bg-blue-500' : 'bg-[#1E293B]'
-            }`}
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg ${sortBy === 'lowToHigh' ? 'bg-blue-500' : 'bg-[#1E293B]'
+              }`}
           >
             Price: Low to High
           </button>
           <button
             onClick={() => setSortBy('highToLow')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg ${
-              sortBy === 'highToLow' ? 'bg-blue-500' : 'bg-[#1E293B]'
-            }`}
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg ${sortBy === 'highToLow' ? 'bg-blue-500' : 'bg-[#1E293B]'
+              }`}
           >
             Price: High to Low
           </button>
           <button
             onClick={() => setSortBy('rating')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg ${
-              sortBy === 'rating' ? 'bg-blue-500' : 'bg-[#1E293B]'
-            }`}
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg ${sortBy === 'rating' ? 'bg-blue-500' : 'bg-[#1E293B]'
+              }`}
           >
             Star Rating
           </button>
@@ -357,11 +354,10 @@ export default function Hotels() {
           <div className="ml-auto flex gap-2">
             <button
               onClick={() => setViewMode('list')}
-              className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-colors ${
-                viewMode === 'list' 
-                ? 'bg-blue-500 text-white' 
-                : 'bg-[#1E293B] text-gray-400 hover:text-white'
-              }`}
+              className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-colors ${viewMode === 'list'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-[#1E293B] text-gray-400 hover:text-white'
+                }`}
               title="List View"
             >
               <IoListOutline className="w-5 h-5" />
@@ -369,11 +365,10 @@ export default function Hotels() {
             </button>
             <button
               onClick={() => setViewMode('map')}
-              className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-colors ${
-                viewMode === 'map' 
-                ? 'bg-blue-500 text-white' 
-                : 'bg-[#1E293B] text-gray-400 hover:text-white'
-              }`}
+              className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-colors ${viewMode === 'map'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-[#1E293B] text-gray-400 hover:text-white'
+                }`}
               title="Map View"
             >
               <IoMapOutline className="w-5 h-5" />
@@ -403,9 +398,8 @@ export default function Hotels() {
                 <button
                   key={stars}
                   onClick={() => setSelectedStar(selectedStar === stars ? null : stars)}
-                  className={`flex items-center gap-1 px-4 py-2 rounded-lg ${
-                    selectedStar === stars ? 'bg-blue-500 text-white' : 'bg-[#1E293B] text-gray-400'
-                  }`}
+                  className={`flex items-center gap-1 px-4 py-2 rounded-lg ${selectedStar === stars ? 'bg-blue-500 text-white' : 'bg-[#1E293B] text-gray-400'
+                    }`}
                 >
                   {[...Array(stars)].map((_, index) => (
                     <StarIcon key={index} className="w-4 h-4 text-yellow-400" />
@@ -485,11 +479,10 @@ export default function Hotels() {
                       : [...prev, amenity]
                   );
                 }}
-                className={`px-4 py-2 rounded-lg ${
-                  selectedAmenities.includes(amenity)
+                className={`px-4 py-2 rounded-lg ${selectedAmenities.includes(amenity)
                     ? 'bg-blue-500 text-white'
                     : 'bg-[#1E293B] text-gray-400'
-                }`}
+                  }`}
               >
                 {amenity}
               </button>
@@ -528,11 +521,16 @@ export default function Hotels() {
                     <div className="flex flex-col md:flex-row">
                       <div className="relative h-64 md:h-auto md:w-1/3">
                         <Image
-                          src={hotel.image}
+                          src={normalizeImageUrl(hotel.image)}
                           alt={hotel.name}
                           fill
                           className="object-cover"
                           sizes="(max-width: 768px) 100vw, 33vw"
+                          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                            const target = e.target as HTMLImageElement;
+                            target.onerror = null;
+                            target.src = PLACEHOLDER_HOTEL_IMAGE;
+                          }}
                         />
                       </div>
                       <div className="p-6 md:w-2/3">
@@ -578,8 +576,8 @@ export default function Hotels() {
         ) : (
           <div className="container mx-auto px-6 py-8">
             <div className="h-[calc(100vh-200px)] min-h-[600px] rounded-xl overflow-hidden">
-              <HotelMap 
-                hotels={filteredHotels} 
+              <HotelMap
+                hotels={filteredHotels}
                 onHotelClick={(hotelId) => handleHotelClick(hotelId)}
               />
             </div>
