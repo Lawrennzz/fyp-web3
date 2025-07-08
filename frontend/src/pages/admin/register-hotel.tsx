@@ -11,30 +11,7 @@ import { config } from '../../config';
 import { doc, setDoc } from 'firebase/firestore';
 import { useFirebase } from '../../contexts/FirebaseContext';
 import { STANDARD_AMENITIES } from '../../utils/constants';
-
-// Import IPFS component if it exists
-let IPFSUploader;
-try {
-    IPFSUploader = require('../../components/IPFSUploader').default;
-} catch (error) {
-    console.error("IPFSUploader component not found, using placeholder");
-    IPFSUploader = ({ onUploadComplete }) => (
-        <div className="mb-6">
-            <label className="block text-sm font-medium mb-2">Upload Images</label>
-            <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 p-6 rounded-lg text-center">
-                <p className="text-gray-500 dark:text-gray-400">
-                    Image upload functionality not available. Please add image URLs manually.
-                </p>
-                <input
-                    type="text"
-                    className="mt-4 w-full px-4 py-2 border rounded-lg bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700"
-                    placeholder="Image URL"
-                    onChange={(e) => onUploadComplete([e.target.value])}
-                />
-            </div>
-        </div>
-    );
-}
+import IPFSUploader from '../../components/IPFSUploader';
 
 // Room types
 const roomTypes = [
@@ -412,30 +389,21 @@ export default function RegisterHotel() {
                             </div>
 
                             {/* Image Upload */}
-                            <div className="mt-6">
-                                <IPFSUploader onUploadComplete={(urls: string[]) => setImageUrls([...imageUrls, ...urls])} />
-
+                            <div className="mb-6">
+                                <label className="block text-gray-300 mb-2">Hotel Images (IPFS)</label>
+                                <IPFSUploader
+                                    onUploadSuccess={(ipfsHash, fileUrl) => setImageUrls(prev => [...prev, fileUrl])}
+                                    acceptedTypes={["image/jpeg", "image/png", "image/webp"]}
+                                    uploadType="hotel-image"
+                                    className="mb-4"
+                                >
+                                    <div className="text-gray-400">Drag & drop or click to upload hotel images (IPFS)</div>
+                                </IPFSUploader>
                                 {imageUrls.length > 0 && (
-                                    <div className="mt-4">
-                                        <label className="block text-sm font-medium mb-2">Uploaded Images</label>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                            {imageUrls.map((url, index) => (
-                                                <div key={index} className="relative">
-                                                    <img
-                                                        src={url}
-                                                        alt={`Hotel image ${index + 1}`}
-                                                        className="h-32 w-full object-cover rounded-lg"
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 text-xs"
-                                                        onClick={() => setImageUrls(imageUrls.filter((_, i) => i !== index))}
-                                                    >
-                                                        ✕
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                        {imageUrls.map((url, idx) => (
+                                            <img key={idx} src={url} alt="Hotel" className="w-20 h-20 object-cover rounded border border-gray-600" />
+                                        ))}
                                     </div>
                                 )}
                             </div>

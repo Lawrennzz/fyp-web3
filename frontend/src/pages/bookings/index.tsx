@@ -5,11 +5,14 @@ import Layout from '@/components/Layout';
 import { useWeb3React } from '@web3-react/core';
 import { Web3Provider } from '@ethersproject/providers';
 import { useFirebase } from '@/contexts/FirebaseContext';
-import { collection, query, where, orderBy, getDocs, onSnapshot, DocumentData, QuerySnapshot, DocumentSnapshot } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, onSnapshot, DocumentData, QuerySnapshot, DocumentSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import QRCode from 'react-qr-code';
 import { config } from '@/config';
 import BookingPDFButton from '@/components/BookingPDFButton';
+import { getCurrentNetwork, getLocalTransactionDetails } from '@/utils/ethereum';
+import { fetchHotelIdMap } from '@/utils/helpers';
+import { NETWORKS } from '@/utils/networks';
 
 interface Booking {
   id: string;
@@ -48,6 +51,8 @@ interface Booking {
   };
 }
 
+type NetworkType = typeof NETWORKS.ganache | typeof NETWORKS.sepolia | null;
+
 export default function Bookings() {
   const router = useRouter();
   const { account } = useWeb3React<Web3Provider>();
@@ -56,6 +61,14 @@ export default function Bookings() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [printView, setPrintView] = useState<Booking | null>(null);
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
+  const [editForm, setEditForm] = useState<any>({});
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
+  const [isCancelSubmitting, setIsCancelSubmitting] = useState(false);
+  const [network, setNetwork] = useState<NetworkType>(null);
+  const [txDetails, setTxDetails] = useState<any>(null);
+  const [showTxModal, setShowTxModal] = useState(false);
+  const [hotelIdMap, setHotelIdMap] = useState<Record<string, string>>({});
 
   const siteOrigin = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 
@@ -108,6 +121,14 @@ export default function Bookings() {
     return () => unsubscribe();
   }, [account, db]);
 
+  useEffect(() => {
+    getCurrentNetwork().then(setNetwork);
+  }, []);
+
+  useEffect(() => {
+    fetchHotelIdMap().then(setHotelIdMap);
+  }, []);
+
   const handlePrint = (booking: Booking) => {
     setPrintView(booking);
     // Use setTimeout to ensure the content is rendered before printing
@@ -115,6 +136,88 @@ export default function Bookings() {
       window.print();
     }, 100);
   };
+
+  const openEditModal = (booking: Booking) => {
+    setEditingBooking(booking);
+    setEditForm({
+      checkIn: booking.checkIn.toDate ? booking.checkIn.toDate().toISOString().slice(0, 10) : '',
+      checkOut: booking.checkOut.toDate ? booking.checkOut.toDate().toISOString().slice(0, 10) : '',
+      guests: booking.guests,
+      guestInfo: { ...booking.guestInfo }
+    });
+  };
+
+  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    if (name.startsWith('guestInfo.')) {
+      setEditForm((prev: any) => ({
+        ...prev,
+        guestInfo: { ...prev.guestInfo, [name.replace('guestInfo.', '')]: value }
+      }));
+    } else {
+      setEditForm((prev: any) => ({ ...prev, [name]: value }));
+    }
+  };
+
+  const submitEdit = async () => {
+    if (!editingBooking) return;
+    setIsEditSubmitting(true);
+    try {
+      // Backend update
+      const res = await fetch(`/api/bookings/${editingBooking.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          checkIn: new Date(editForm.checkIn),
+          checkOut: new Date(editForm.checkOut),
+          guests: Number(editForm.guests),
+          guestInfo: editForm.guestInfo
+        })
+      });
+      if (!res.ok) throw new Error('Failed to update booking');
+      const updated = await res.json();
+      // Firestore update
+      if (db) {
+        const bookingRef = doc(db, 'bookings', editingBooking.id);
+        await updateDoc(bookingRef, {
+          checkIn: new Date(editForm.checkIn),
+          checkOut: new Date(editForm.checkOut),
+          guests: Number(editForm.guests),
+          guestInfo: editForm.guestInfo
+        });
+      }
+      setEditingBooking(null);
+    } catch (err) {
+      alert('Error updating booking.');
+    } finally {
+      setIsEditSubmitting(false);
+    }
+  };
+
+  const cancelBooking = async (booking: Booking) => {
+    if (!window.confirm('Are you sure you want to cancel this booking?')) return;
+    setIsCancelSubmitting(true);
+    try {
+      // Backend cancel
+      const res = await fetch(`/api/bookings/${booking.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to cancel booking');
+      // Firestore update
+      if (db) {
+        const bookingRef = doc(db, 'bookings', booking.id);
+        await updateDoc(bookingRef, { status: 'cancelled' });
+      }
+    } catch (err) {
+      alert('Error cancelling booking.');
+    } finally {
+      setIsCancelSubmitting(false);
+    }
+  };
+
+  async function handleViewTx(txHash: string) {
+    const details = await getLocalTransactionDetails(txHash);
+    setTxDetails(details);
+    setShowTxModal(true);
+  }
 
   if (!account) {
     return (
@@ -306,22 +409,25 @@ export default function Bookings() {
                           <p className="text-xl font-semibold">${booking.totalPrice} USDT</p>
                         </div>
                         <div className="space-y-2">
-                          <a
-                            href={`https://sepolia.etherscan.io/tx/${booking.transactionHash}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block text-sm text-blue-400 hover:text-blue-300"
-                          >
-                            View Transaction
-                          </a>
+                          {network && network.name === 'Sepolia' ? (
+                            <a
+                              href={`https://sepolia.etherscan.io/tx/${booking.transactionHash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block text-sm text-blue-400 hover:text-blue-300"
+                            >
+                              View on Etherscan
+                            </a>
+                          ) : (
+                            <button
+                              onClick={() => handleViewTx(booking.transactionHash)}
+                              className="block text-sm text-blue-400 hover:text-blue-300"
+                            >
+                              View Local Tx Details
+                            </button>
+                          )}
                           <button
                             onClick={() => {
-                              const hotelIdMap: { [key: string]: string } = {
-                                "The Ritz-Carlton": "6856a0646aaf52ea0c8ebc83",
-                                "Mandarin Oriental": "6856a0646aaf52ea0c8ebc86",
-                                "Le Royal Monceau": "6856a0646aaf52ea0c8ebc89"
-                              };
-
                               const correctHotelId = hotelIdMap[booking.hotelDetails.name] || booking.hotelId;
                               router.push(`/hotels/${correctHotelId}`);
                             }}
@@ -344,12 +450,82 @@ export default function Bookings() {
                             Print Booking Details
                           </button>
                           <BookingPDFButton booking={booking} />
+                          {booking.status === 'active' && new Date(booking.checkIn) > new Date() && (
+                            <div className="flex gap-2 mt-2">
+                              <button
+                                className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
+                                onClick={() => openEditModal(booking)}
+                                disabled={isEditSubmitting}
+                              >Edit</button>
+                              <button
+                                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                                onClick={() => cancelBooking(booking)}
+                                disabled={isCancelSubmitting}
+                              >Cancel</button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Edit Modal */}
+          {editingBooking && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-[#1E293B] p-8 rounded-xl w-full max-w-lg">
+                <h2 className="text-2xl font-bold mb-4 text-white">Edit Booking</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-gray-300 mb-1">Check-in</label>
+                    <input type="date" name="checkIn" value={editForm.checkIn} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-gray-300 mb-1">Check-out</label>
+                    <input type="date" name="checkOut" value={editForm.checkOut} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-gray-300 mb-1">Guests</label>
+                    <input type="number" name="guests" value={editForm.guests} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" min={1} />
+                  </div>
+                  <div>
+                    <label className="block text-gray-300 mb-1">First Name</label>
+                    <input type="text" name="guestInfo.firstName" value={editForm.guestInfo?.firstName || ''} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-gray-300 mb-1">Last Name</label>
+                    <input type="text" name="guestInfo.lastName" value={editForm.guestInfo?.lastName || ''} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-gray-300 mb-1">Email</label>
+                    <input type="email" name="guestInfo.email" value={editForm.guestInfo?.email || ''} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-gray-300 mb-1">Phone</label>
+                    <input type="tel" name="guestInfo.phone" value={editForm.guestInfo?.phone || ''} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-6">
+                  <button className="px-4 py-2 bg-gray-600 text-white rounded-lg" onClick={() => setEditingBooking(null)} disabled={isEditSubmitting}>Cancel</button>
+                  <button className="px-4 py-2 bg-blue-500 text-white rounded-lg" onClick={submitEdit} disabled={isEditSubmitting}>Save</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Transaction Details Modal */}
+          {showTxModal && txDetails && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-[#1E293B] p-8 rounded-xl w-full max-w-2xl text-white">
+                <h2 className="text-2xl font-bold mb-4">Transaction Details</h2>
+                <pre className="overflow-x-auto whitespace-pre-wrap text-sm bg-gray-900 p-4 rounded-lg max-h-96">{JSON.stringify(txDetails, null, 2)}</pre>
+                <div className="flex justify-end mt-4">
+                  <button className="px-4 py-2 bg-blue-500 rounded-lg" onClick={() => setShowTxModal(false)}>Close</button>
+                </div>
+              </div>
             </div>
           )}
         </div>

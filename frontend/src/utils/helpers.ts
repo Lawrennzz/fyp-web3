@@ -2,6 +2,8 @@
  * Helper functions for the application
  */
 
+import axios from 'axios';
+
 // Constants for default images and placeholders
 export const PLACEHOLDER_HOTEL_IMAGE = "https://placehold.co/800x600/e0e0e0/808080?text=Hotel+Placeholder";
 
@@ -152,4 +154,15 @@ export function isEmpty(value: any): boolean {
     if (Array.isArray(value) && value.length === 0) return true;
     if (typeof value === 'object' && Object.keys(value).length === 0) return true;
     return false;
+}
+
+export async function fetchHotelIdMap() {
+    const res = await axios.get('/api/hotels');
+    // Assuming the backend returns an array of hotels with _id and name
+    const hotels = res.data;
+    const map: Record<string, string> = {};
+    hotels.forEach((hotel: any) => {
+        map[hotel.name] = hotel._id;
+    });
+    return map;
 } 

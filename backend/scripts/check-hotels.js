@@ -66,4 +66,17 @@ async function checkHotels() {
     }
 }
 
-checkHotels(); 
+async function main() {
+    await mongoose.connect(config.mongoURI, { useNewUrlParser: true, useUnifiedTopology: true });
+    const hotels = await Hotel.find();
+    hotels.forEach(hotel => {
+        console.log(`${hotel.name}: ${hotel._id}`);
+    });
+    await mongoose.disconnect();
+}
+
+checkHotels();
+main().catch(err => {
+    console.error(err);
+    process.exit(1);
+}); 

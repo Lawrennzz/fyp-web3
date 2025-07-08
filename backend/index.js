@@ -7,6 +7,7 @@ const hotelRoutes = require('./routes/hotels');
 const healthRouter = require('./routes/health');
 const adminRouter = require('./routes/admin');
 const ownerRouter = require('./routes/owner');
+const bookingsRouter = require('./routes/bookings');
 const admin = require('firebase-admin');
 const fs = require('fs');
 const path = require('path');
@@ -52,6 +53,7 @@ app.use('/api/hotels', hotelRoutes);
 app.use('/api/health', healthRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/owner', ownerRouter);
+app.use('/api/bookings', bookingsRouter);
 
 // Function to print all registered routes
 const printRoutes = (app) => {

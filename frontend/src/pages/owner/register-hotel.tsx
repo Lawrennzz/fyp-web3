@@ -6,6 +6,7 @@ import axios from 'axios';
 import { config } from '../../config';
 import Link from 'next/link';
 import { STANDARD_AMENITIES } from '../../utils/constants';
+import IPFSUploader from '../../components/IPFSUploader';
 
 interface FormData {
     name: string;
@@ -16,6 +17,7 @@ interface FormData {
         address: string;
     };
     image: string;
+    images: string[];
     rating: number;
     amenities: string[];
 }
@@ -32,6 +34,7 @@ export default function RegisterHotel() {
             address: ''
         },
         image: '',
+        images: [],
         rating: 0,
         amenities: []
     });
@@ -76,6 +79,14 @@ export default function RegisterHotel() {
         }
     };
 
+    const handleIPFSUpload = (ipfsHash: string, fileUrl: string) => {
+        setFormData(prev => ({
+            ...prev,
+            images: [...prev.images, fileUrl],
+            image: prev.image || fileUrl // set main image if not set
+        }));
+    };
+
     const handleSubmit = async (e: React.FormEvent): Promise<void> => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -94,6 +105,7 @@ export default function RegisterHotel() {
                 description: formData.description,
                 location: formData.location,
                 image: formData.image,
+                images: formData.images,
                 rating: Number(formData.rating),
                 amenities: formData.amenities,
                 ownerId: user.uid
@@ -263,16 +275,22 @@ export default function RegisterHotel() {
                                 </div>
 
                                 <div>
-                                    <label htmlFor="image" className="block text-gray-300 mb-2">Image URL</label>
-                                    <input
-                                        type="text"
-                                        id="image"
-                                        name="image"
-                                        value={formData.image}
-                                        onChange={handleChange}
-                                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        placeholder="Enter image URL (optional)"
-                                    />
+                                    <label className="block text-gray-300 mb-2">Hotel Images (IPFS)</label>
+                                    <IPFSUploader
+                                        onUploadSuccess={handleIPFSUpload}
+                                        acceptedTypes={["image/jpeg", "image/png", "image/webp"]}
+                                        uploadType="hotel-image"
+                                        className="mb-4"
+                                    >
+                                        <div className="text-gray-400">Drag & drop or click to upload hotel images (IPFS)</div>
+                                    </IPFSUploader>
+                                    {formData.images.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 mt-2">
+                                            {formData.images.map((url, idx) => (
+                                                <img key={idx} src={url} alt="Hotel" className="w-20 h-20 object-cover rounded border border-gray-600" />
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

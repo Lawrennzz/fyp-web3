@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../../../components/Layout';
 import { useFirebase } from '../../../contexts/FirebaseContext';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { config } from '../../../config';
 
@@ -40,6 +40,10 @@ export default function BookingConfirmation() {
     const [booking, setBooking] = useState<BookingConfirmation | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [editing, setEditing] = useState(false);
+    const [editForm, setEditForm] = useState<any>({});
+    const [isEditSubmitting, setIsEditSubmitting] = useState(false);
+    const [isCancelSubmitting, setIsCancelSubmitting] = useState(false);
 
     useEffect(() => {
         if (!id || !db) return;
@@ -71,6 +75,87 @@ export default function BookingConfirmation() {
 
         fetchBooking();
     }, [id, db]);
+
+    const openEditModal = () => {
+        if (!booking) return;
+        setEditForm({
+            checkIn: booking.checkIn.toDate ? booking.checkIn.toDate().toISOString().slice(0, 10) : '',
+            checkOut: booking.checkOut.toDate ? booking.checkOut.toDate().toISOString().slice(0, 10) : '',
+            guests: booking.guests,
+            guestInfo: { ...booking.guestInfo }
+        });
+        setEditing(true);
+    };
+
+    const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        if (name.startsWith('guestInfo.')) {
+            setEditForm((prev: any) => ({
+                ...prev,
+                guestInfo: { ...prev.guestInfo, [name.replace('guestInfo.', '')]: value }
+            }));
+        } else {
+            setEditForm((prev: any) => ({ ...prev, [name]: value }));
+        }
+    };
+
+    const submitEdit = async () => {
+        if (!booking) return;
+        setIsEditSubmitting(true);
+        try {
+            // Backend update
+            const res = await fetch(`/api/bookings/${booking.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    checkIn: new Date(editForm.checkIn),
+                    checkOut: new Date(editForm.checkOut),
+                    guests: Number(editForm.guests),
+                    guestInfo: editForm.guestInfo
+                })
+            });
+            if (!res.ok) throw new Error('Failed to update booking');
+            // Firestore update
+            if (db) {
+                const bookingRef = doc(db, 'bookings', booking.id);
+                await updateDoc(bookingRef, {
+                    checkIn: new Date(editForm.checkIn),
+                    checkOut: new Date(editForm.checkOut),
+                    guests: Number(editForm.guests),
+                    guestInfo: editForm.guestInfo
+                });
+            }
+            setEditing(false);
+            // Optionally, reload booking
+            router.replace(router.asPath);
+        } catch (err) {
+            alert('Error updating booking.');
+        } finally {
+            setIsEditSubmitting(false);
+        }
+    };
+
+    const cancelBooking = async () => {
+        if (!booking) return;
+        if (!window.confirm('Are you sure you want to cancel this booking?')) return;
+        setIsCancelSubmitting(true);
+        try {
+            // Backend cancel
+            const res = await fetch(`/api/bookings/${booking.id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Failed to cancel booking');
+            // Firestore update
+            if (db) {
+                const bookingRef = doc(db, 'bookings', booking.id);
+                await updateDoc(bookingRef, { status: 'cancelled' });
+            }
+            // Optionally, reload booking
+            router.replace(router.asPath);
+        } catch (err) {
+            alert('Error cancelling booking.');
+        } finally {
+            setIsCancelSubmitting(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -152,9 +237,67 @@ export default function BookingConfirmation() {
                                 </div>
                             </div>
                         </div>
+
+                        {booking.status === 'active' && new Date(booking.checkIn.toDate()) > new Date() && (
+                            <div className="flex gap-2 mt-8">
+                                <button
+                                    className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
+                                    onClick={openEditModal}
+                                    disabled={isEditSubmitting}
+                                >Edit</button>
+                                <button
+                                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                                    onClick={cancelBooking}
+                                    disabled={isCancelSubmitting}
+                                >Cancel</button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
+
+            {/* Edit Modal */}
+            {editing && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-[#1E293B] p-8 rounded-xl w-full max-w-lg">
+                        <h2 className="text-2xl font-bold mb-4 text-white">Edit Booking</h2>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-gray-300 mb-1">Check-in</label>
+                                <input type="date" name="checkIn" value={editForm.checkIn} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" />
+                            </div>
+                            <div>
+                                <label className="block text-gray-300 mb-1">Check-out</label>
+                                <input type="date" name="checkOut" value={editForm.checkOut} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" />
+                            </div>
+                            <div>
+                                <label className="block text-gray-300 mb-1">Guests</label>
+                                <input type="number" name="guests" value={editForm.guests} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" min={1} />
+                            </div>
+                            <div>
+                                <label className="block text-gray-300 mb-1">First Name</label>
+                                <input type="text" name="guestInfo.firstName" value={editForm.guestInfo?.firstName || ''} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" />
+                            </div>
+                            <div>
+                                <label className="block text-gray-300 mb-1">Last Name</label>
+                                <input type="text" name="guestInfo.lastName" value={editForm.guestInfo?.lastName || ''} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" />
+                            </div>
+                            <div>
+                                <label className="block text-gray-300 mb-1">Email</label>
+                                <input type="email" name="guestInfo.email" value={editForm.guestInfo?.email || ''} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" />
+                            </div>
+                            <div>
+                                <label className="block text-gray-300 mb-1">Phone</label>
+                                <input type="tel" name="guestInfo.phone" value={editForm.guestInfo?.phone || ''} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" />
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2 mt-6">
+                            <button className="px-4 py-2 bg-gray-600 text-white rounded-lg" onClick={() => setEditing(false)} disabled={isEditSubmitting}>Cancel</button>
+                            <button className="px-4 py-2 bg-blue-500 text-white rounded-lg" onClick={submitEdit} disabled={isEditSubmitting}>Save</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </Layout>
     );
 } 
