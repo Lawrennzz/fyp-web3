@@ -49,6 +49,17 @@ interface Booking {
     email: string;
     phone: string;
   };
+  editRequested?: boolean;
+  refunded?: boolean;
+  policy?: {
+    type: string;
+    canEdit: boolean;
+    canCancel: boolean;
+    editDeadlineHours?: number;
+    cancelDeadlineHours?: number;
+    refundable: string;
+    cancelFee?: number;
+  };
 }
 
 type NetworkType = typeof NETWORKS.ganache | typeof NETWORKS.sepolia | null;
@@ -61,14 +72,12 @@ export default function Bookings() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [printView, setPrintView] = useState<Booking | null>(null);
-  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
-  const [editForm, setEditForm] = useState<any>({});
-  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
-  const [isCancelSubmitting, setIsCancelSubmitting] = useState(false);
+  const [managingBooking, setManagingBooking] = useState<Booking | null>(null);
   const [network, setNetwork] = useState<NetworkType>(null);
   const [txDetails, setTxDetails] = useState<any>(null);
   const [showTxModal, setShowTxModal] = useState(false);
   const [hotelIdMap, setHotelIdMap] = useState<Record<string, string>>({});
+  const [isEditing, setIsEditing] = useState(false);
 
   const siteOrigin = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 
@@ -138,65 +147,56 @@ export default function Bookings() {
   };
 
   const openEditModal = (booking: Booking) => {
-    setEditingBooking(booking);
-    setEditForm({
-      checkIn: booking.checkIn.toDate ? booking.checkIn.toDate().toISOString().slice(0, 10) : '',
-      checkOut: booking.checkOut.toDate ? booking.checkOut.toDate().toISOString().slice(0, 10) : '',
-      guests: booking.guests,
-      guestInfo: { ...booking.guestInfo }
-    });
+    setManagingBooking(booking);
+    setIsEditing(true);
   };
 
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     if (name.startsWith('guestInfo.')) {
-      setEditForm((prev: any) => ({
+      setManagingBooking((prev: any) => ({
         ...prev,
         guestInfo: { ...prev.guestInfo, [name.replace('guestInfo.', '')]: value }
       }));
     } else {
-      setEditForm((prev: any) => ({ ...prev, [name]: value }));
+      setManagingBooking((prev: any) => ({ ...prev, [name]: value }));
     }
   };
 
   const submitEdit = async () => {
-    if (!editingBooking) return;
-    setIsEditSubmitting(true);
+    if (!managingBooking) return;
     try {
       // Backend update
-      const res = await fetch(`/api/bookings/${editingBooking.id}`, {
+      const res = await fetch(`/api/bookings/${managingBooking.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          checkIn: new Date(editForm.checkIn),
-          checkOut: new Date(editForm.checkOut),
-          guests: Number(editForm.guests),
-          guestInfo: editForm.guestInfo
+          checkIn: new Date(managingBooking.checkIn),
+          checkOut: new Date(managingBooking.checkOut),
+          guests: Number(managingBooking.guests),
+          guestInfo: managingBooking.guestInfo
         })
       });
       if (!res.ok) throw new Error('Failed to update booking');
       const updated = await res.json();
       // Firestore update
       if (db) {
-        const bookingRef = doc(db, 'bookings', editingBooking.id);
+        const bookingRef = doc(db, 'bookings', managingBooking.id);
         await updateDoc(bookingRef, {
-          checkIn: new Date(editForm.checkIn),
-          checkOut: new Date(editForm.checkOut),
-          guests: Number(editForm.guests),
-          guestInfo: editForm.guestInfo
+          checkIn: new Date(managingBooking.checkIn),
+          checkOut: new Date(managingBooking.checkOut),
+          guests: Number(managingBooking.guests),
+          guestInfo: managingBooking.guestInfo
         });
       }
-      setEditingBooking(null);
+      setManagingBooking(null);
     } catch (err) {
       alert('Error updating booking.');
-    } finally {
-      setIsEditSubmitting(false);
     }
   };
 
   const cancelBooking = async (booking: Booking) => {
     if (!window.confirm('Are you sure you want to cancel this booking?')) return;
-    setIsCancelSubmitting(true);
     try {
       // Backend cancel
       const res = await fetch(`/api/bookings/${booking.id}`, { method: 'DELETE' });
@@ -206,10 +206,10 @@ export default function Bookings() {
         const bookingRef = doc(db, 'bookings', booking.id);
         await updateDoc(bookingRef, { status: 'cancelled' });
       }
+      alert('Booking cancelled. Please initiate refund via MetaMask.');
+      // TODO: Trigger MetaMask refund logic here
     } catch (err) {
       alert('Error cancelling booking.');
-    } finally {
-      setIsCancelSubmitting(false);
     }
   };
 
@@ -217,6 +217,113 @@ export default function Bookings() {
     const details = await getLocalTransactionDetails(txHash);
     setTxDetails(details);
     setShowTxModal(true);
+  }
+
+  let manageBookingModal = null;
+  if (managingBooking) {
+    const checkInTime = managingBooking.checkIn.toDate().getTime();
+    const now = Date.now();
+    const editDeadline = (managingBooking.policy?.editDeadlineHours || 24) * 60 * 60 * 1000;
+    const cancelDeadline = (managingBooking.policy?.cancelDeadlineHours || 24) * 60 * 60 * 1000;
+    const canEdit = managingBooking.policy?.canEdit &&
+      !managingBooking.editRequested &&
+      now < checkInTime - editDeadline;
+    const canCancel = managingBooking.policy?.canCancel &&
+      now < checkInTime - cancelDeadline;
+    console.log('Booking policy:', managingBooking.policy);
+    console.log('EditRequested:', managingBooking.editRequested);
+    console.log('Check-in:', managingBooking.checkIn?.toDate?.());
+    manageBookingModal = (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-[#1E293B] p-8 rounded-xl w-full max-w-2xl text-white">
+          <h2 className="text-2xl font-bold mb-4">Manage My Booking</h2>
+          {isEditing ? (
+            <div>
+              <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block mb-1">Check-in</label>
+                  <input type="date" name="checkIn" value={format(managingBooking.checkIn.toDate(), 'yyyy-MM-dd')} onChange={e => setManagingBooking(prev => prev ? { ...prev, checkIn: new Date(e.target.value) } : prev)} className="w-full p-2 rounded bg-gray-800 text-white" />
+                </div>
+                <div>
+                  <label className="block mb-1">Check-out</label>
+                  <input type="date" name="checkOut" value={format(managingBooking.checkOut.toDate(), 'yyyy-MM-dd')} onChange={e => setManagingBooking(prev => prev ? { ...prev, checkOut: new Date(e.target.value) } : prev)} className="w-full p-2 rounded bg-gray-800 text-white" />
+                </div>
+                <div>
+                  <label className="block mb-1">Guests</label>
+                  <input type="number" name="guests" min="1" value={managingBooking.guests} onChange={e => setManagingBooking(prev => prev ? { ...prev, guests: Number(e.target.value) } : prev)} className="w-full p-2 rounded bg-gray-800 text-white" />
+                </div>
+                <div>
+                  <label className="block mb-1">First Name</label>
+                  <input type="text" name="guestInfo.firstName" value={managingBooking.guestInfo?.firstName || ''} onChange={handleEditChange} className="w-full p-2 rounded bg-gray-800 text-white" />
+                  <label className="block mb-1 mt-2">Last Name</label>
+                  <input type="text" name="guestInfo.lastName" value={managingBooking.guestInfo?.lastName || ''} onChange={handleEditChange} className="w-full p-2 rounded bg-gray-800 text-white" />
+                  <label className="block mb-1 mt-2">Email</label>
+                  <input type="email" name="guestInfo.email" value={managingBooking.guestInfo?.email || ''} onChange={handleEditChange} className="w-full p-2 rounded bg-gray-800 text-white" />
+                  <label className="block mb-1 mt-2">Phone</label>
+                  <input type="text" name="guestInfo.phone" value={managingBooking.guestInfo?.phone || ''} onChange={handleEditChange} className="w-full p-2 rounded bg-gray-800 text-white" />
+                </div>
+              </div>
+              <div className="flex gap-2 mt-6">
+                <button className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600" onClick={async () => { await submitEdit(); setIsEditing(false); }}>Save</button>
+                <button className="px-4 py-2 bg-gray-600 text-white rounded-lg" onClick={() => setIsEditing(false)}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold mb-2">Booking Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p><span className="font-medium">Hotel:</span> {managingBooking.hotelDetails?.name}</p>
+                    <p><span className="font-medium">Room Type:</span> {managingBooking.roomDetails?.type}</p>
+                    <p><span className="font-medium">Check-in:</span> {format(managingBooking.checkIn.toDate(), 'PPP')}</p>
+                    <p><span className="font-medium">Check-out:</span> {format(managingBooking.checkOut.toDate(), 'PPP')}</p>
+                    <p><span className="font-medium">Guests:</span> {managingBooking.guests}</p>
+                    <p><span className="font-medium">Total Price:</span> ${managingBooking.totalPrice} USDT</p>
+                  </div>
+                  <div>
+                    <p><span className="font-medium">Guest Name:</span> {managingBooking.guestInfo?.firstName} {managingBooking.guestInfo?.lastName}</p>
+                    <p><span className="font-medium">Email:</span> {managingBooking.guestInfo?.email}</p>
+                    <p><span className="font-medium">Phone:</span> {managingBooking.guestInfo?.phone}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold mb-2">Booking Policy</h3>
+                <div className="bg-gray-900 p-4 rounded-lg">
+                  <p><span className="font-medium">Type:</span> {managingBooking.policy?.type || 'Standard Flexible'}</p>
+                  <p><span className="font-medium">Edit allowed:</span> {managingBooking.policy?.canEdit ? `Yes, before ${managingBooking.policy?.editDeadlineHours || 24}h before check-in` : 'No'}</p>
+                  <p><span className="font-medium">Cancel allowed:</span> {managingBooking.policy?.canCancel ? `Yes, before ${managingBooking.policy?.cancelDeadlineHours || 24}h before check-in` : 'No'}</p>
+                  <p><span className="font-medium">Refund:</span> {managingBooking.policy?.refundable === 'full' ? 'Full refund' : managingBooking.policy?.refundable === 'partial' ? 'Partial refund' : 'No refund'}</p>
+                  {managingBooking.policy?.cancelFee ? (
+                    <p><span className="font-medium">Cancel Fee:</span> {managingBooking.policy.cancelFee} USDT</p>
+                  ) : null}
+                </div>
+              </div>
+              <div className="flex gap-2 mt-6">
+                {canEdit ? (
+                  <button
+                    className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
+                    onClick={() => setIsEditing(true)}
+                  >Edit Booking</button>
+                ) : (
+                  <button className="px-4 py-2 bg-gray-600 text-white rounded-lg" disabled>Edit Not Allowed</button>
+                )}
+                {canCancel ? (
+                  <button
+                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                    onClick={() => cancelBooking(managingBooking)}
+                  >Cancel Booking</button>
+                ) : (
+                  <button className="px-4 py-2 bg-gray-600 text-white rounded-lg" disabled>Cancel Not Allowed</button>
+                )}
+                <button className="px-4 py-2 bg-blue-500 text-white rounded-lg ml-auto" onClick={() => setManagingBooking(null)}>Close</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
   }
 
   if (!account) {
@@ -450,20 +557,12 @@ export default function Bookings() {
                             Print Booking Details
                           </button>
                           <BookingPDFButton booking={booking} />
-                          {booking.status === 'active' && new Date(booking.checkIn) > new Date() && (
-                            <div className="flex gap-2 mt-2">
-                              <button
-                                className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
-                                onClick={() => openEditModal(booking)}
-                                disabled={isEditSubmitting}
-                              >Edit</button>
-                              <button
-                                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
-                                onClick={() => cancelBooking(booking)}
-                                disabled={isCancelSubmitting}
-                              >Cancel</button>
-                            </div>
-                          )}
+                          <button
+                            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                            onClick={() => setManagingBooking(booking)}
+                          >
+                            Manage My Booking
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -473,48 +572,7 @@ export default function Bookings() {
             </div>
           )}
 
-          {/* Edit Modal */}
-          {editingBooking && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-[#1E293B] p-8 rounded-xl w-full max-w-lg">
-                <h2 className="text-2xl font-bold mb-4 text-white">Edit Booking</h2>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-gray-300 mb-1">Check-in</label>
-                    <input type="date" name="checkIn" value={editForm.checkIn} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" />
-                  </div>
-                  <div>
-                    <label className="block text-gray-300 mb-1">Check-out</label>
-                    <input type="date" name="checkOut" value={editForm.checkOut} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" />
-                  </div>
-                  <div>
-                    <label className="block text-gray-300 mb-1">Guests</label>
-                    <input type="number" name="guests" value={editForm.guests} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" min={1} />
-                  </div>
-                  <div>
-                    <label className="block text-gray-300 mb-1">First Name</label>
-                    <input type="text" name="guestInfo.firstName" value={editForm.guestInfo?.firstName || ''} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" />
-                  </div>
-                  <div>
-                    <label className="block text-gray-300 mb-1">Last Name</label>
-                    <input type="text" name="guestInfo.lastName" value={editForm.guestInfo?.lastName || ''} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" />
-                  </div>
-                  <div>
-                    <label className="block text-gray-300 mb-1">Email</label>
-                    <input type="email" name="guestInfo.email" value={editForm.guestInfo?.email || ''} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" />
-                  </div>
-                  <div>
-                    <label className="block text-gray-300 mb-1">Phone</label>
-                    <input type="tel" name="guestInfo.phone" value={editForm.guestInfo?.phone || ''} onChange={handleEditChange} className="w-full px-3 py-2 rounded bg-gray-700 text-white" />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2 mt-6">
-                  <button className="px-4 py-2 bg-gray-600 text-white rounded-lg" onClick={() => setEditingBooking(null)} disabled={isEditSubmitting}>Cancel</button>
-                  <button className="px-4 py-2 bg-blue-500 text-white rounded-lg" onClick={submitEdit} disabled={isEditSubmitting}>Save</button>
-                </div>
-              </div>
-            </div>
-          )}
+          {manageBookingModal}
 
           {/* Transaction Details Modal */}
           {showTxModal && txDetails && (

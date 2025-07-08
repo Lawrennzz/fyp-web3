@@ -20,7 +20,9 @@ const BookingSchema = new mongoose.Schema({
         phone: String
     },
     transactionHash: { type: String },
-    approvalHash: { type: String }
+    approvalHash: { type: String },
+    editRequested: { type: Boolean, default: false },
+    refunded: { type: Boolean, default: false }
 });
 
 module.exports = mongoose.model('Booking', BookingSchema); 

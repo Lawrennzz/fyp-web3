@@ -147,6 +147,17 @@ export default function Checkout({ }: CheckoutProps) {
         transactionHash: receipt.transactionHash,
         approvalHash: approveReceipt.transactionHash,
         status: 'confirmed',
+        editRequested: false,
+        refunded: false,
+        policy: {
+          type: "Standard Flexible",
+          canEdit: true,
+          canCancel: true,
+          refundable: "full",
+          editDeadlineHours: 24,
+          cancelDeadlineHours: 24,
+          cancelFee: 0
+        },
         createdAt: Timestamp.now(),
         guestInfo: {
           firstName: formData.firstName,
