@@ -59,6 +59,10 @@ export default function AdminDashboard() {
 
   // Helper function to safely convert values to numbers
   const getNumberValue = (value: any): number => {
+    if (BigNumber.isBigNumber(value)) {
+      // For token values (like USDT, ETH), convert to string and format
+      return parseFloat(ethers.utils.formatUnits(value, 18)); // 18 decimals for ETH/USDT
+    }
     if (value && typeof value.toNumber === 'function') {
       return value.toNumber();
     }
