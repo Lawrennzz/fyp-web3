@@ -10,7 +10,7 @@ import HotelBookingABI from '../../contracts/HotelBooking.json';
 import { Web3Provider } from '@ethersproject/providers';
 import { config } from '../../config';
 import { ethers } from 'ethers';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot, QuerySnapshot, DocumentData } from 'firebase/firestore';
 import { useFirebase } from '../../contexts/FirebaseContext';
 
 interface Transaction {
@@ -105,25 +105,27 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (isAdmin && !authLoading) {
-      // Always fetch Firebase bookings regardless of blockchain connectivity
-      fetchFirebaseBookings();
-
+      // Set up real-time listener for Firebase bookings
+      const bookingsCollection = collection(db, 'bookings');
+      const unsubscribe = onSnapshot(bookingsCollection, (snapshot) => {
+        const bookingsData = snapshot.docs.map((doc: any) => ({
+          id: doc.id,
+          ...doc.data()
+        })) as any[];
+        setFirebaseBookings(bookingsData);
+        updateStatsWithFirebaseData(bookingsData);
+      });
       // Fetch blockchain data if available
       if (account && library) {
         fetchTransactions();
         fetchDashboardStats();
-
-        // Listen for new events
         const contract = getContract(
           config.HOTEL_BOOKING_CONTRACT,
           HotelBookingABI.abi,
           library as Web3Provider
         );
-
         const bookingFilter = contract.filters.BookingCreated();
-
         contract.on(bookingFilter, (bookingId, hotelId, roomId, guest, checkInDate, checkOutDate) => {
-          // Use the component-level getNumberValue function
           const newTx: Transaction = {
             id: bookingId.toString(),
             guestAddress: guest,
@@ -138,14 +140,13 @@ export default function AdminDashboard() {
           setTransactions(prev => [...prev, newTx]);
           fetchDashboardStats();
         });
-
         return () => {
           contract.removeAllListeners();
+          unsubscribe();
         };
       } else {
-        console.log('💡 No blockchain connection, displaying only Firebase data');
-        // Set loading to false since we won't be fetching blockchain data
         setLoading(false);
+        return unsubscribe;
       }
     }
   }, [account, library, isAdmin, authLoading]);
@@ -410,17 +411,6 @@ export default function AdminDashboard() {
                     })), null, 2)}
                   </pre>
                 </div>
-              </div>
-              <div className="mt-4">
-                <button
-                  onClick={() => {
-                    fetchFirebaseBookings();
-                    fetchDashboardStats();
-                  }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  Refresh Data
-                </button>
               </div>
             </div>
           )}
