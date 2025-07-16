@@ -190,8 +190,12 @@ export default function EditRoom() {
             // Filter out empty image fields
             const filteredImages = formData.images.filter(img => img.url.trim() !== '');
 
+            // Filter amenities to only include valid ones
+            const validAmenities = formData.amenities.filter(a => roomAmenities.includes(a));
+
             const roomData = {
                 ...formData,
+                amenities: validAmenities,
                 images: filteredImages.length > 0 ? filteredImages : [{
                     url: 'https://images.unsplash.com/photo-1566665797739-1674de7a421a',
                     alt: 'Default Room Image'
