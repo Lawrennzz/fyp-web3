@@ -113,14 +113,19 @@ export default function AdminDashboard() {
     if (isAdmin && !authLoading) {
       // Set up real-time listener for Firebase bookings
       const bookingsCollection = collection(db, 'bookings');
-      const unsubscribe = onSnapshot(bookingsCollection, (snapshot) => {
-        const bookingsData = snapshot.docs.map((doc: any) => ({
-          id: doc.id,
-          ...doc.data()
-        })) as any[];
-        setFirebaseBookings(bookingsData);
-        updateStatsWithFirebaseData(bookingsData);
-      });
+      const unsubscribe = onSnapshot(
+        bookingsCollection,
+        {
+          next: (snapshot: any) => {
+            const bookingsData = snapshot.docs.map((doc: any) => ({
+              id: doc.id,
+              ...doc.data()
+            })) as any[];
+            setFirebaseBookings(bookingsData);
+            updateStatsWithFirebaseData(bookingsData);
+          }
+        }
+      );
       // Fetch blockchain data if available
       if (account && library) {
         fetchTransactions();
@@ -191,21 +196,21 @@ export default function AdminDashboard() {
   const updateStatsWithFirebaseData = (bookings: any[]) => {
     if (!bookings || bookings.length === 0) return;
 
-    // Calculate total revenue from Firebase bookings
-    const totalFirebaseRevenue = bookings.reduce((sum, booking) => {
-      // Use totalPrice if available, otherwise use price
+    // Only include confirmed or completed bookings
+    const validBookings = bookings.filter(
+      booking => booking.status === 'confirmed' || booking.status === 'completed'
+    );
+
+    // Calculate total revenue from valid bookings
+    const totalFirebaseRevenue = validBookings.reduce((sum, booking) => {
       const bookingPrice = booking.totalPrice || booking.price || 0;
       return sum + (typeof bookingPrice === 'number' ? bookingPrice : parseFloat(bookingPrice) || 0);
     }, 0);
 
-    console.log('💰 Total Firebase Revenue:', totalFirebaseRevenue);
-    console.log('🔢 Total Firebase Transactions:', bookings.length);
-
-    // Update stats with Firebase data
     setStats(prevStats => ({
       ...prevStats,
-      totalTransactions: prevStats.totalTransactions + bookings.length,
-      totalRevenue: prevStats.totalRevenue + totalFirebaseRevenue
+      totalTransactions: validBookings.length,
+      totalRevenue: totalFirebaseRevenue
     }));
   };
 
