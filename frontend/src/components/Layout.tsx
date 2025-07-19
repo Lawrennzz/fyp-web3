@@ -12,6 +12,7 @@ import { useWalletConnect } from '../hooks/useWalletConnect';
 import { useRouter } from 'next/router';
 import { hooks } from '../utils/web3Config';
 import ConnectWalletModal from './ConnectWalletModal';
+import Footer from './Footer';
 
 interface LayoutProps {
   children: ReactNode;
@@ -162,7 +163,7 @@ export default function Layout({ children }: LayoutProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#0F172A]">
+    <div className="min-h-screen bg-[#0F172A] flex flex-col">
       <nav className="bg-[#1E293B] border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -263,7 +264,8 @@ export default function Layout({ children }: LayoutProps) {
           </div>
         </div>
       </nav>
-      <main>{children}</main>
+      <main className="flex-1">{children}</main>
+      <Footer />
       <SimpleBackendStatus />
     </div>
   );
