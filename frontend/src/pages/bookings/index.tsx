@@ -5,7 +5,7 @@ import Layout from '@/components/Layout';
 import { useWeb3React } from '@web3-react/core';
 import { Web3Provider } from '@ethersproject/providers';
 import { useFirebase } from '@/contexts/FirebaseContext';
-import { collection, query, where, orderBy, getDocs, onSnapshot, DocumentData, QuerySnapshot, DocumentSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, onSnapshot, DocumentData, QuerySnapshot, DocumentSnapshot, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { format } from 'date-fns';
 import QRCode from 'react-qr-code';
 import { config } from '@/config';
@@ -166,31 +166,27 @@ export default function Bookings() {
   const submitEdit = async () => {
     if (!managingBooking) return;
     try {
-      // Backend update
-      const res = await fetch(`/api/bookings/${managingBooking.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          checkIn: new Date(managingBooking.checkIn),
-          checkOut: new Date(managingBooking.checkOut),
-          guests: Number(managingBooking.guests),
-          guestInfo: managingBooking.guestInfo
-        })
-      });
-      if (!res.ok) throw new Error('Failed to update booking');
-      const updated = await res.json();
-      // Firestore update
       if (db) {
         const bookingRef = doc(db, 'bookings', managingBooking.id);
         await updateDoc(bookingRef, {
-          checkIn: new Date(managingBooking.checkIn),
-          checkOut: new Date(managingBooking.checkOut),
+          checkIn: Timestamp.fromDate(
+            managingBooking.checkIn.toDate
+              ? managingBooking.checkIn.toDate()
+              : new Date(managingBooking.checkIn)
+          ),
+          checkOut: Timestamp.fromDate(
+            managingBooking.checkOut.toDate
+              ? managingBooking.checkOut.toDate()
+              : new Date(managingBooking.checkOut)
+          ),
           guests: Number(managingBooking.guests),
           guestInfo: managingBooking.guestInfo
         });
+        alert('Booking updated successfully.');
       }
       setManagingBooking(null);
     } catch (err) {
+      console.error(err);
       alert('Error updating booking.');
     }
   };
@@ -198,16 +194,11 @@ export default function Bookings() {
   const cancelBooking = async (booking: Booking) => {
     if (!window.confirm('Are you sure you want to cancel this booking?')) return;
     try {
-      // Backend cancel
-      const res = await fetch(`/api/bookings/${booking.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to cancel booking');
-      // Firestore update
       if (db) {
         const bookingRef = doc(db, 'bookings', booking.id);
         await updateDoc(bookingRef, { status: 'cancelled' });
+        alert('Booking cancelled. Please initiate refund via MetaMask.');
       }
-      alert('Booking cancelled. Please initiate refund via MetaMask.');
-      // TODO: Trigger MetaMask refund logic here
     } catch (err) {
       alert('Error cancelling booking.');
     }
@@ -219,9 +210,20 @@ export default function Bookings() {
     setShowTxModal(true);
   }
 
+  // Helper to get JS time from Firestore Timestamp, Date, or string
+  function getTime(val: any): number {
+    if (val && typeof val.toDate === 'function') {
+      return val.toDate().getTime();
+    } else if (val instanceof Date) {
+      return val.getTime();
+    } else {
+      return new Date(val).getTime();
+    }
+  }
+
   let manageBookingModal = null;
   if (managingBooking) {
-    const checkInTime = managingBooking.checkIn.toDate().getTime();
+    const checkInTime = getTime(managingBooking.checkIn);
     const now = Date.now();
     const editDeadline = (managingBooking.policy?.editDeadlineHours || 24) * 60 * 60 * 1000;
     const cancelDeadline = (managingBooking.policy?.cancelDeadlineHours || 24) * 60 * 60 * 1000;
@@ -232,7 +234,7 @@ export default function Bookings() {
       now < checkInTime - cancelDeadline;
     console.log('Booking policy:', managingBooking.policy);
     console.log('EditRequested:', managingBooking.editRequested);
-    console.log('Check-in:', managingBooking.checkIn?.toDate?.());
+    console.log('Check-in:', managingBooking.checkIn);
     manageBookingModal = (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-[#1E293B] p-8 rounded-xl w-full max-w-2xl text-white">
@@ -242,11 +244,11 @@ export default function Bookings() {
               <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block mb-1">Check-in</label>
-                  <input type="date" name="checkIn" value={format(managingBooking.checkIn.toDate(), 'yyyy-MM-dd')} onChange={e => setManagingBooking(prev => prev ? { ...prev, checkIn: new Date(e.target.value) } : prev)} className="w-full p-2 rounded bg-gray-800 text-white" />
+                  <input type="date" name="checkIn" value={format(getTime(managingBooking.checkIn), 'yyyy-MM-dd')} onChange={e => setManagingBooking(prev => prev ? { ...prev, checkIn: new Date(e.target.value) } : prev)} className="w-full p-2 rounded bg-gray-800 text-white" />
                 </div>
                 <div>
                   <label className="block mb-1">Check-out</label>
-                  <input type="date" name="checkOut" value={format(managingBooking.checkOut.toDate(), 'yyyy-MM-dd')} onChange={e => setManagingBooking(prev => prev ? { ...prev, checkOut: new Date(e.target.value) } : prev)} className="w-full p-2 rounded bg-gray-800 text-white" />
+                  <input type="date" name="checkOut" value={format(getTime(managingBooking.checkOut), 'yyyy-MM-dd')} onChange={e => setManagingBooking(prev => prev ? { ...prev, checkOut: new Date(e.target.value) } : prev)} className="w-full p-2 rounded bg-gray-800 text-white" />
                 </div>
                 <div>
                   <label className="block mb-1">Guests</label>
@@ -276,8 +278,8 @@ export default function Bookings() {
                   <div>
                     <p><span className="font-medium">Hotel:</span> {managingBooking.hotelDetails?.name}</p>
                     <p><span className="font-medium">Room Type:</span> {managingBooking.roomDetails?.type}</p>
-                    <p><span className="font-medium">Check-in:</span> {format(managingBooking.checkIn.toDate(), 'PPP')}</p>
-                    <p><span className="font-medium">Check-out:</span> {format(managingBooking.checkOut.toDate(), 'PPP')}</p>
+                    <p><span className="font-medium">Check-in:</span> {format(getTime(managingBooking.checkIn), 'PPP')}</p>
+                    <p><span className="font-medium">Check-out:</span> {format(getTime(managingBooking.checkOut), 'PPP')}</p>
                     <p><span className="font-medium">Guests:</span> {managingBooking.guests}</p>
                     <p><span className="font-medium">Total Price:</span> ${managingBooking.totalPrice} USDT</p>
                   </div>
@@ -384,8 +386,8 @@ export default function Bookings() {
               <h2 className="text-xl font-semibold mb-4">Booking Details</h2>
               <div className="space-y-2">
                 <p><span className="font-medium">Room Type:</span> {printView.roomDetails.type}</p>
-                <p><span className="font-medium">Check-in:</span> {format(printView.checkIn.toDate(), 'PPP')}</p>
-                <p><span className="font-medium">Check-out:</span> {format(printView.checkOut.toDate(), 'PPP')}</p>
+                <p><span className="font-medium">Check-in:</span> {format(getTime(printView.checkIn), 'PPP')}</p>
+                <p><span className="font-medium">Check-out:</span> {format(getTime(printView.checkOut), 'PPP')}</p>
                 <p><span className="font-medium">Guests:</span> {printView.guests}</p>
                 <p><span className="font-medium">Total Price:</span> ${printView.totalPrice} USDT</p>
                 <p><span className="font-medium">Status:</span> {printView.status}</p>
@@ -502,11 +504,11 @@ export default function Bookings() {
                         </div>
                         <div>
                           <p className="text-gray-400">Check-in</p>
-                          <p className="font-medium">{format(booking.checkIn.toDate(), 'PPP')}</p>
+                          <p className="font-medium">{format(getTime(booking.checkIn), 'PPP')}</p>
                         </div>
                         <div>
                           <p className="text-gray-400">Check-out</p>
-                          <p className="font-medium">{format(booking.checkOut.toDate(), 'PPP')}</p>
+                          <p className="font-medium">{format(getTime(booking.checkOut), 'PPP')}</p>
                         </div>
                       </div>
 

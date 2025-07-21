@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../../../components/Layout';
 import { useFirebase } from '../../../contexts/FirebaseContext';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { config } from '../../../config';
 
@@ -103,24 +103,11 @@ export default function BookingConfirmation() {
         if (!booking) return;
         setIsEditSubmitting(true);
         try {
-            // Backend update
-            const res = await fetch(`/api/bookings/${booking.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    checkIn: new Date(editForm.checkIn),
-                    checkOut: new Date(editForm.checkOut),
-                    guests: Number(editForm.guests),
-                    guestInfo: editForm.guestInfo
-                })
-            });
-            if (!res.ok) throw new Error('Failed to update booking');
-            // Firestore update
             if (db) {
                 const bookingRef = doc(db, 'bookings', booking.id);
                 await updateDoc(bookingRef, {
-                    checkIn: new Date(editForm.checkIn),
-                    checkOut: new Date(editForm.checkOut),
+                    checkIn: Timestamp.fromDate(new Date(editForm.checkIn)),
+                    checkOut: Timestamp.fromDate(new Date(editForm.checkOut)),
                     guests: Number(editForm.guests),
                     guestInfo: editForm.guestInfo
                 });
@@ -129,6 +116,7 @@ export default function BookingConfirmation() {
             // Optionally, reload booking
             router.replace(router.asPath);
         } catch (err) {
+            console.error(err);
             alert('Error updating booking.');
         } finally {
             setIsEditSubmitting(false);
