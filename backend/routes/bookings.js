@@ -43,4 +43,16 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+// GET /api/bookings/hotel/:hotelId - Get all bookings for a specific hotel
+router.get('/hotel/:hotelId', async (req, res) => {
+    try {
+        const { hotelId } = req.params;
+        if (!hotelId) return res.status(400).json({ message: 'Hotel ID is required' });
+        const bookings = await Booking.find({ hotelId });
+        res.json(bookings);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 module.exports = router; 

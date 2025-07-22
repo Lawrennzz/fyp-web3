@@ -4,6 +4,8 @@ import Layout from '../../../components/Layout';
 import { useAuth } from '../../../contexts/FirebaseContext';
 import axios from 'axios';
 import { config } from '../../../config';
+import { useFirebase } from '../../../contexts/FirebaseContext';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import Link from 'next/link';
 
 interface Room {
@@ -34,6 +36,33 @@ interface Hotel {
     blockchainId?: string;
 }
 
+interface Booking {
+    _id: string;
+    userId: string;
+    hotelId: string;
+    roomId: string;
+    checkIn: string;
+    checkOut: string;
+    guests: number;
+    totalPrice: number;
+    status: string;
+    createdAt: string;
+    hotelName?: string;
+    roomType?: string;
+    guestInfo?: {
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+        phone?: string;
+    };
+    transactionHash?: string;
+}
+
+// Helper to check if value is a Firestore Timestamp
+function isTimestamp(val: any): val is { toDate: () => Date } {
+    return val && typeof val.toDate === 'function';
+}
+
 export default function ManageHotel() {
     const { user, isHotelOwner, loading } = useAuth();
     const router = useRouter();
@@ -46,6 +75,10 @@ export default function ManageHotel() {
     const [debugInfo, setDebugInfo] = useState<any>({});
     const [isDeleting, setIsDeleting] = useState(false);
     const [roomToDelete, setRoomToDelete] = useState<string | null>(null);
+    const [bookings, setBookings] = useState<Booking[]>([]);
+    const [bookingsLoading, setBookingsLoading] = useState(false);
+    const [bookingsError, setBookingsError] = useState<string | null>(null);
+    const { db } = useFirebase();
 
     // Fetch hotel details
     useEffect(() => {
@@ -121,6 +154,27 @@ export default function ManageHotel() {
             fetchHotel();
         }
     }, [id, user]);
+
+    // Fetch bookings for this hotel from Firebase
+    useEffect(() => {
+        const fetchBookings = async () => {
+            if (!id || !db) return;
+            setBookingsLoading(true);
+            setBookingsError(null);
+            try {
+                const bookingsRef = collection(db, 'bookings');
+                const q = query(bookingsRef, where('hotelId', '==', id));
+                const querySnapshot = await getDocs(q);
+                const bookingsData = querySnapshot.docs.map(doc => ({ _id: doc.id, ...doc.data() })) as Booking[];
+                setBookings(bookingsData);
+            } catch (err) {
+                setBookingsError('Failed to load bookings for this hotel.');
+            } finally {
+                setBookingsLoading(false);
+            }
+        };
+        if (id && db) fetchBookings();
+    }, [id, db]);
 
     // Remove the additional ownership check since we're handling it in fetchHotel
     useEffect(() => {
@@ -293,14 +347,47 @@ export default function ManageHotel() {
         }
     };
 
+    // Function to delete the hotel
+    const handleDeleteHotel = async () => {
+        if (!id) return;
+        if (!window.confirm('Are you sure you want to delete this hotel? This action cannot be undone.')) return;
+        setIsDeleting(true);
+        try {
+            await axios.delete(`${config.API_URL}/api/hotels/${id}`);
+            setMessage('Hotel deleted successfully. Redirecting...');
+            setTimeout(() => {
+                router.push('/owner');
+            }, 1500);
+        } catch (err: any) {
+            setError('Failed to delete hotel.');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
     return (
         <Layout>
             <div className="container mx-auto px-4 py-8">
                 <div className="flex justify-between items-center mb-8">
                     <h1 className="text-3xl font-bold text-white">{hotel.name}</h1>
-                    <Link href="/owner" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                        Back to Dashboard
-                    </Link>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => router.push(`/owner/hotel/${hotel._id}/edit`)}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                            </svg>
+                            Edit Details
+                        </button>
+                        <button
+                            onClick={handleDeleteHotel}
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center"
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? 'Deleting...' : 'Delete Hotel'}
+                        </button>
+                    </div>
                 </div>
 
                 {message && (
@@ -379,6 +466,63 @@ export default function ManageHotel() {
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                {/* Transaction/Bookings List */}
+                <div className="bg-gray-800 shadow-xl rounded-xl overflow-hidden mb-8 border border-gray-700">
+                    <div className="p-6">
+                        <h2 className="text-2xl font-bold text-white mb-4">Bookings / Transactions</h2>
+                        {bookingsLoading ? (
+                            <div className="text-gray-300">Loading bookings...</div>
+                        ) : bookingsError ? (
+                            <div className="text-red-400">{bookingsError}</div>
+                        ) : bookings.length === 0 ? (
+                            <div className="text-gray-400">No bookings found for this hotel.</div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-700">
+                                    <thead className="bg-gray-700/50">
+                                        <tr>
+                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Guest</th>
+                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Check-In</th>
+                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Check-Out</th>
+                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Total Price</th>
+                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
+                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Tx Hash</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-gray-800 divide-y divide-gray-700">
+                                        {bookings.map((booking) => (
+                                            <tr key={booking._id}>
+                                                <td className="px-4 py-2 text-white">{booking.guestInfo?.firstName || ''} {booking.guestInfo?.lastName || ''}</td>
+                                                <td className="px-4 py-2 text-white">{
+                                                    isTimestamp(booking.checkIn)
+                                                        ? booking.checkIn.toDate().toLocaleDateString()
+                                                        : booking.checkIn
+                                                            ? new Date(booking.checkIn).toLocaleDateString()
+                                                            : ''
+                                                }</td>
+                                                <td className="px-4 py-2 text-white">{
+                                                    isTimestamp(booking.checkOut)
+                                                        ? booking.checkOut.toDate().toLocaleDateString()
+                                                        : booking.checkOut
+                                                            ? new Date(booking.checkOut).toLocaleDateString()
+                                                            : ''
+                                                }</td>
+                                                <td className="px-4 py-2 text-white">${booking.totalPrice}</td>
+                                                <td className="px-4 py-2 text-white">{booking.status}</td>
+                                                <td className="px-4 py-2 text-blue-400">
+                                                    {booking.transactionHash ? (
+                                                        <a href={`https://sepolia.etherscan.io/tx/${booking.transactionHash}`} target="_blank" rel="noopener noreferrer" className="underline">{booking.transactionHash.slice(0, 10)}...</a>
+                                                    ) : 'N/A'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
                 </div>
 
