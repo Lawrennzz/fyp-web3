@@ -39,3 +39,9 @@
 
 # Firebase Admin Key (sensitive)
 backend/firebase-admin-key.json
+travelgo-fyp-firebase-adminsdk-fbsvc-51a5e3cbfd.json
+**/*firebase-adminsdk*.json
+
+# Backup data files
+hotel_booking.hotels.json
+travel_go.hotels.json
